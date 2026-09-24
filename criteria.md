@@ -28,6 +28,10 @@ tool calls and returns a fit card — in at least 4 of 5 tries.
 <!-- Why 4 of 5 and not 5 of 5? Something about your search, probably —
      "my search is a plain keyword match and some phrasings will miss" is a
      real answer. -->
+My search is a plain keyword-overlap match with no synonym or fuzzy
+matching, so a query that matches a listing in spirit can still score zero
+on wording alone. That's an expected miss from how my search is built, not a
+broken loop, so I leave room for it instead of promising 5 of 5.
 
 ---
 
@@ -39,6 +43,9 @@ Given a query that matches no listings, the agent stops before calling
 **Why this target:**
 <!-- Why is 5 of 5 reasonable here when criterion 1 isn't? What's different
      about this path? -->
+Stopping here is just an `if not session["search_results"]` check in my own
+loop, with no model or fuzzy-matching randomness involved. If this isn't 5
+of 5, the loop has a bug, not a hard case.
 
 ---
 
@@ -55,10 +62,15 @@ Given a query that matches no listings, the agent stops before calling
      suggest_outfit is the shape you're after. -->
 
 
+Given a matching query, `session["selected_item"]["id"]` after `search_listings`
+returns equals the `id` of the `new_item` dict that `suggest_outfit` actually
+receives — in 5 of 5 tries, checked by trace, not by re-reading the code.
 
 **Why this target:**
-
-
+This one should be 5 of 5 or the loop is broken, not flaky, since there's no
+randomness between picking `search_results[0]` and passing it along, so any
+mismatch is a wiring bug. A weaker target would just be hiding a bug behind
+a percentage.
 
 ---
 
@@ -76,10 +88,15 @@ Given a query that matches no listings, the agent stops before calling
      be turned into a number. -->
 
 
+Given the same item and outfit run 5 times, every one of the 5 fit cards
+mentions the item's price and platform at least once each — 5 of 5, no
+matter how the wording around them varies.
 
 **Why this target:**
-
-
+The words can and should change, since that's `TEMPERATURE = 0.9` doing its
+job rather than a defect. Price and platform are instructions in my prompt,
+not style, and a model follows them close to every time, so anything under
+5 of 5 signals a prompt problem, not a rate to relax.
 
 ---
 
@@ -93,8 +110,15 @@ Given a query that matches no listings, the agent stops before calling
      or an observable outcome. -->
 
 
+Given an empty wardrobe, `suggest_outfit` still returns a non-empty string
+of general styling advice (not an error, not "") and the run completes
+through to a fit card — in 5 of 5 tries.
 
 **Why this target:**
+This is a fixed branch I control, checking `wardrobe['items']` and taking
+the general-advice prompt path when it's empty, so nothing about it should
+vary. If it fails, it's because I forgot to handle the empty case, not
+because the model or the search got unlucky.
 
 
 
