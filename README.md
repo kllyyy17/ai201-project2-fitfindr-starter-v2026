@@ -59,24 +59,31 @@
 
 ### `search_listings`
 
-- **What it does:**
-- **Inputs:** <!-- name and type each: `max_price` (float), not "a price" -->
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Filters the mock listings dataset by size and price ceiling, scores what's left by keyword overlap with the description, and returns the best matches.
+- **Inputs:**
+  - `description` (str) — free-text keywords describing what the user wants, e.g. `"vintage graphic tee"`.
+  - `size` (str or None) — a size string to filter by, matched case-insensitively against each listing's `size` field as a whole-token match (e.g. splitting on `/` and `,`), not a substring test — so `"m"` matches `"S/M"` but not `"us 9"`, and `"l"` does not match `"XL"`. `None` skips size filtering.
+  - `max_price` (float or None) — maximum price, inclusive. `None` skips price filtering.
+- **Returns:** A `list[dict]`, sorted best-match-first, of at most `config.SEARCH_RESULT_LIMIT` listing dicts. Each dict has: `id` (str), `title` (str), `description` (str), `category` (str), `style_tags` (list[str]), `size` (str), `condition` (str), `price` (float), `colors` (list[str]), `brand` (str or None), `platform` (str).
+- **When it has nothing:** Returns `[]` — an empty list, never `None` and never an exception — when no listing survives the size/price filters, or when everything that survives scores zero keyword overlap with `description`.
 
 ### `suggest_outfit`
 
-- **What it does:**
+- **What it does:** Calls the model to suggest one or two outfits pairing a thrifted item with the user's existing wardrobe (or with general styling advice if they have none).
 - **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+  - `new_item` (dict) — a listing dict (the shape returned by `search_listings`) for the item under consideration.
+  - `wardrobe` (dict) — a wardrobe dict with an `'items'` key holding a `list[dict]`, each item shaped like `{id, name, category, colors, style_tags, notes}` (`notes` may be `None`). `items` may be `[]`.
+- **Returns:** A non-empty `str` of outfit suggestions in prose, naming specific wardrobe pieces by name when the wardrobe is non-empty.
+- **When it has nothing:** When `wardrobe['items']` is `[]`, it does not return `""` and does not raise — it returns a non-empty `str` of general styling advice for `new_item` alone (no wardrobe pieces named, since none exist).
 
 ### `create_fit_card`
 
-- **What it does:**
+- **What it does:** Calls the model to turn an outfit suggestion and an item into a short, postable caption.
 - **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+  - `outfit` (str) — the suggestion string returned by `suggest_outfit()`.
+  - `new_item` (dict) — the listing dict for the item (same shape as `search_listings` returns).
+- **Returns:** A `str`, two to four sentences, that mentions the item, its price, and its platform once each, and reads like a social post rather than a product description.
+- **When it has nothing:** If `outfit` is `""` or whitespace-only, returns a descriptive message string explaining the card couldn't be built — it does not raise and does not call the model.
 
 ---
 
@@ -93,13 +100,13 @@
      The grader checks your code against what you claim here, so the file and
      function have to be real. -->
 
-**Branch rule:**
+**Branch rule:** If `search_listings` returns an empty list, put a message in `session["error"]` naming what the user could change (loosen the price, drop the size, try different keywords) and return the session immediately — do not call `suggest_outfit`. Otherwise, take `session["search_results"][0]` as `session["selected_item"]` and continue to `suggest_outfit`, then `create_fit_card`.
 
 **Where it lives:** `agent.py::run_agent`
 
-**How the query is parsed:** <!-- regex, string splitting, or asking the model — say which -->
+**How the query is parsed:** Regex — pull `size` from a `\bsize\s+(\S+)\b` pattern and `max_price` from an `under \$?(\d+(\.\d+)?)` pattern, then strip those matched substrings out of the query and use whatever text remains as `description`.
 
-**What moves through the session:** <!-- which fields, in what order -->
+**What moves through the session, in order:** `query` → `parsed` (`description`, `size`, `max_price`) → `search_results` → `selected_item` → `outfit_suggestion` → `fit_card`. `error` is set only on the empty-search branch, in which case everything after `search_results` stays `None`.
 
 ---
 
