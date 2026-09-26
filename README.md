@@ -120,8 +120,30 @@
 **One full query**
 
 ```
-$ python app.py ask '...'
+$ python app.py ask 'vintage graphic tee under $30'
 
+  Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
+
+  Outfit:   Here are two outfit ideas using the new Y2K Butterfly Baby Tee and pieces from your existing wardrobe:
+
+**Outfit 1: Casual Y2K Streetwear**
+*   **Top:** Y2K Baby Tee (Butterfly Print)
+*   **Bottoms:** Baggy straight-leg jeans (dark wash)
+*   **Shoes:** Chunky white sneakers
+*   **Accessories:** Black crossbody bag
+*   **Why it works:** The tight, fitted silhouette of the baby tee creates a great Y2K-inspired proportion balance when paired with your baggy, dark wash jeans. Add the chunky white sneakers and black crossbody bag to complete an effortless, everyday throwback look.
+
+**Outfit 2: Edgy Contrast**
+*   **Top:** Y2K Baby Tee (Butterfly Print)
+*   **Bottoms:** Wide-leg khaki trousers
+*   **Outerwear:** Vintage black denim jacket (slightly cropped)
+*   **Shoes:** Black combat boots
+*   **Accessories:** Brown leather belt
+*   **Why it works:** Pairing the feminine, pink-and-purple butterfly print with your structured wide-leg khakis and chunky black combat boots creates a cool contrast between soft and edgy. Tucking the baby tee in with the brown leather belt and layering the slightly cropped denim jacket on top ties the whole outfit together.
+
+  Fit card: I am losing my mind over this thrift find—I just scored the cutest Y2K Butterfly Baby Tee on Depop for only $18, and it's literal perfection! The pink-and-purple print gives off major 2000s pop-star energy, whether you want to style it with baggy jeans for effortless streetwear or toughen it up with combat boots. Honestly, my inner child is screaming, and I can't wait to wear this everywhere. 🦋✨
+
+0 model calls this session, 2 served from cache
 ```
 
 **The three tools, tested one at a time**
