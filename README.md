@@ -39,9 +39,7 @@
 
 ## What This Does
 
-<!-- Three or four sentences: what a user asks for, and what they get back. -->
-
-
+FitFindr takes a plain-language request like `"vintage graphic tee under $30, size M"` and turns it into a full secondhand-shopping recommendation. It pulls the size and price ceiling out of the query, searches a mock listings dataset for the best keyword match, then asks the model to suggest an outfit pairing that item with the user's existing wardrobe (or general styling advice if the wardrobe is empty), and finally turns that suggestion into a short, postable caption naming the item, its price, and its platform. If nothing in the dataset survives the filters, it stops early and tells the user what to loosen — price, size, or keywords — instead of guessing.
 
 ---
 
@@ -206,15 +204,15 @@ I am literally losing my mind over these vintage Levi's 501 jeans I just scored 
 
 **Moment 1**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* After wiring up the loop, I asked Claude to create a test file so I could see exactly what was being checked and the actual results, rather than just taking its word for it.
+- *What came back:* A verification script (`check_agent.py`) checking the tools and loop against the README's own claims — including that `create_fit_card` mentions the item's price. That check looked for `str(item["price"])` (`"38.0"`) or `f"${price:.2f}"` (`"$38.00"`) inside the caption. Running it came back 24/25 passed — the one failure was a real fit card that wrote the price as `"$38"`, which matched neither string.
+- *What I changed:* Had the price check loosened to `str(int(item["price"])) in card` — matching just the digits instead of a specific formatting. The tool was fine; the check's assumption about how the model would phrase the price wasn't.
 
 **Moment 2**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* After wiring up the loop, I told Claude "I don't think it's able to pick up the $30 in `run_agent`" — my test of `'vintage graphic tee under $30'` looked like it wasn't parsing the price.
+- *What came back:* It ran `_parse_query` directly in bash and got the correct result (`max_price: 30.0`), then re-ran my exact PowerShell command and reproduced the failure — PowerShell was interpolating `$30` as an (empty) variable inside the double-quoted `-c` string before Python ever saw it, so the regex had nothing to match.
+- *What I changed:* Nothing in `agent.py` — the parsing code was already correct. I changed how I tested it (single-quoting the query / using `python app.py ask '...'` instead of a `-c` one-liner), and now know to be careful with `$` in PowerShell when testing.
 
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
