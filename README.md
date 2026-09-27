@@ -296,19 +296,67 @@ that produced it:
 **Happy path**
 
 ```
+$ python app.py ask 'vintage graphic tee under $30' --trace
 
+[1] _parse_query
+      in:  vintage graphic tee under $30
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+[3] suggest_outfit
+      in:  dict with keys: new_item, wardrobe
+      out: Here are two outfit ideas using the new Y2K Butterfly Baby Tee and pieces from your existing wardrobe:  **Outf…
+[4] create_fit_card
+      in:  dict with keys: outfit, new_item
+      out: I am losing my mind over this thrift find—I just scored the cutest Y2K Butterfly Baby Tee on Depop for only $1…
+
+  Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
+
+  Outfit:   Here are two outfit ideas using the new Y2K Butterfly Baby Tee and pieces from your existing wardrobe:
+
+**Outfit 1: Casual Y2K Streetwear**
+*   **Top:** Y2K Baby Tee (Butterfly Print)
+*   **Bottoms:** Baggy straight-leg jeans (dark wash)
+*   **Shoes:** Chunky white sneakers
+*   **Accessories:** Black crossbody bag
+*   **Why it works:** The tight, fitted silhouette of the baby tee creates a great Y2K-inspired proportion balance when paired with your baggy, dark wash jeans. Add the chunky white sneakers and black crossbody bag to complete an effortless, everyday throwback look.
+
+**Outfit 2: Edgy Contrast**
+*   **Top:** Y2K Baby Tee (Butterfly Print)
+*   **Bottoms:** Wide-leg khaki trousers
+*   **Outerwear:** Vintage black denim jacket (slightly cropped)
+*   **Shoes:** Black combat boots
+*   **Accessories:** Brown leather belt
+*   **Why it works:** Pairing the feminine, pink-and-purple butterfly print with your structured wide-leg khakis and chunky black combat boots creates a cool contrast between soft and edgy. Tucking the baby tee in with the brown leather belt and layering the slightly cropped denim jacket on top ties the whole outfit together.
+
+  Fit card: I am losing my mind over this thrift find—I just scored the cutest Y2K Butterfly Baby Tee on Depop for only $18, and it’s literal perfection! The pink-and-purple print gives off major 2000s pop-star energy, whether you want to style it with baggy jeans for effortless streetwear or toughen it up with combat boots. Honestly, my inner child is screaming, and I can't wait to wear this everywhere. 🦋✨
+
+0 model calls this session, 2 served from cache
 ```
 
 **Empty search**
 
 ```
+$ python app.py ask 'designer ballgown size XXS under $5' --trace
 
+[1] _parse_query
+      in:  designer ballgown size XXS under $5
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: [] (empty)
+[3] branch
+      →    search_results empty — stopping before suggest_outfit
+
+  No listings matched that search. Try loosening the price ceiling, dropping the size filter, or using different keywords in the description.
+
+0 model calls this session
 ```
 
-**On the MCP move:** <!-- what changed in your code, and whether anything
-behaved differently afterwards. If the rewire didn't work, say exactly where it
-broke — the error text and the last thing that worked. That earns the point in
-full. -->
+The empty-search trace is three steps against the happy path's four: it stops right after `search_listings` sees nothing, instead of going on to `suggest_outfit` and `create_fit_card`.
+
+**On the MCP move:** `search_listings` is registered in `mcp_server.py` under its own name, with a docstring stating the size-match rule, the price ceiling, and the empty-list return, the same contract as the Tool Inventory above. `agent.py::run_agent` calls it through `mcp_client.call_tool("search_listings", {...})` instead of importing `tools.search_listings` directly. The rewire worked on the first attempt; the trace line `search_listings (via MCP)` above is the same 10-item result the direct call used to return, so nothing about the tool's behavior changed, only how it's reached.
 
 
 
