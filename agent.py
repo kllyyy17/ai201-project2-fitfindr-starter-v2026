@@ -142,11 +142,12 @@ def run_agent(query: str, wardrobe: dict) -> dict:
 
     count += 1
     trace.check_iterations(count)
-    session["search_results"] = search_listings(
-        description=session["parsed"]["description"],
-        size=session["parsed"]["size"],
-        max_price=session["parsed"]["max_price"],
-    )
+    from mcp_client import call_tool
+    session["search_results"] = call_tool("search_listings", {
+        "description": session["parsed"]["description"],
+        "size": session["parsed"]["size"],
+        "max_price": session["parsed"]["max_price"],
+    })
 
     if not session["search_results"]:
         session["error"] = (
