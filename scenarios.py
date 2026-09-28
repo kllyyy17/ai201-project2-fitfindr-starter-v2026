@@ -29,24 +29,31 @@ SCENARIOS = [
         "criterion": 2,
     },
     {
-        # A user with nothing saved. One of unit 4's three failure modes.
-        "name": "empty wardrobe",
+        # A matching query, checked by trace: does selected_item["id"] equal
+        # the id inside the new_item dict suggest_outfit actually received?
+        # Criterion 3 — state.
+        "name": "selected item matches item passed on",
+        "query": "vintage graphic tee under $30",
+        "wardrobe": "example",
+        "criterion": 3,
+    },
+    {
+        # Same query every try, so the same item and outfit go into
+        # create_fit_card five times — what varies is only the model's
+        # wording. Criterion 4 — fit card mentions price and platform.
+        "name": "fit card mentions price and platform",
+        "query": "vintage graphic tee under $30",
+        "wardrobe": "example",
+        "criterion": 4,
+    },
+    {
+        # A user with nothing saved. Criterion 5 — the empty-wardrobe branch
+        # in suggest_outfit still returns non-empty general styling advice.
+        "name": "empty wardrobe still returns styling advice",
         "query": "denim jacket under $50",
         "wardrobe": "empty",
-        "criterion": None,
+        "criterion": 5,
     },
-    # TODO: add what your criteria 3, 4 and 5 need.
-    #
-    # Set "criterion" to the number in criteria.md that the scenario tests.
-    # "criterion": None means a diagnostic run — useful to have, but it isn't
-    # one of your five, and run_eval.py marks it as such in the table.
-    #
-    # For a state criterion, any normal query works — what you're checking is
-    # what ends up in the session, not what the user typed.
-    #
-    # For a fit-card criterion, you probably want the SAME query listed more
-    # than once, or several different items, depending on what your criterion
-    # actually says.
 ]
 
 WARDROBES = ("example", "empty")

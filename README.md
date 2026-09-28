@@ -234,17 +234,93 @@ I am literally losing my mind over these vintage Levi's 501 jeans I just scored 
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. Full three-tool run returns a fit card | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. Empty search stops before tool 2 | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. `selected_item["id"]` matches the `new_item["id"]` `suggest_outfit` receives | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Every fit card mentions the item's price and platform | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. Empty wardrobe still returns non-empty styling advice through to a fit card | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
-**Real output from one try**, pasted as text, naming the file and function
-that produced it:
+Full output for all 25 tries (5 scenarios × 5 tries) is in
+[`results/run_2026-09-27_2004_before.md`](results/run_2026-09-27_2004_before.md),
+produced by `python run_eval.py --label before` with caching off.
+
+**Real output for each criterion**, pasted as text, naming the file and
+function that produced it.
+
+**Criterion 1** — `run_eval.py::run_once` → `agent.py::run_agent`, scenario
+`"matching query completes"`, try 1:
 
 ```
+[1] _parse_query
+      in:  vintage graphic tee under $30
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+[3] suggest_outfit
+      in:  dict with keys: new_item, wardrobe
+      out: Here are two outfit ideas using the new Y2K Butterfly Baby Tee and pieces from your existing wardrobe:  **Outf…
+[4] create_fit_card
+      in:  dict with keys: outfit, new_item
+      out: I literally screamed when I found this Y2K butterfly baby tee on Depop for just $18! The little rhinestone gra…
 
+selected_item: Y2K Baby Tee — Butterfly Print ($18.0, depop)
+fit_card: I literally screamed when I found this Y2K butterfly baby tee on Depop for just $18! The little rhinestone graphics give it the ultimate early-2000s mall-rat energy. I can't wait to style the fitted, cropped silhouette with some baggy dark-wash jeans for that effortless off-duty look.
+```
+
+**Criterion 2** — `run_eval.py::run_once` → `agent.py::run_agent`, scenario
+`"impossible query stops early"`, try 1:
+
+```
+[1] _parse_query
+      in:  designer ballgown size XXS under $5
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: [] (empty)
+[3] branch
+      →    search_results empty — stopping before suggest_outfit
+
+stopped early: yes — No listings matched that search. Try loosening the price ceiling, dropping the size filter, or using different keywords in the description.
+```
+
+**Criterion 3** — a small spy script wrapping `tools.suggest_outfit` (patched
+into `agent.py`'s namespace, the same one `agent.py::run_agent` calls) so the
+`new_item` it actually receives is captured independently of the session
+dict, run 5 times against `agent.py::run_agent`:
+
+```
+try 1: selected_item.id='lst_002'  new_item passed to suggest_outfit id='lst_002'  match=True
+try 2: selected_item.id='lst_002'  new_item passed to suggest_outfit id='lst_002'  match=True
+try 3: selected_item.id='lst_002'  new_item passed to suggest_outfit id='lst_002'  match=True
+try 4: selected_item.id='lst_002'  new_item passed to suggest_outfit id='lst_002'  match=True
+try 5: selected_item.id='lst_002'  new_item passed to suggest_outfit id='lst_002'  match=True
+```
+
+**Criterion 4** — `tools.py::create_fit_card`, scenario `"fit card mentions
+price and platform"`, same item (`Y2K Baby Tee — Butterfly Print`, $18.0,
+depop) across all 5 tries — wording changes, price and platform don't drop
+out:
+
+```
+Try 1: I am literally losing my mind over this Y2K butterfly baby tee I just scored on Depop for only $18! It has the absolute best nostalgic, early-2000s mall-goth energy, especially paired with baggy denim or wide-leg trousers. I already have a million outfits planned in my head! 🦋✨
+Try 2: I am still screaming over this Y2K butterfly baby tee I just scored on Depop for only $18! The pink, purple, and white graphic is so nostalgic, and it looks unreal paired with baggy dark wash jeans for that ultimate early-2000s street style. Honestly, tucking it into wide-leg khakis with some combat boots gives the absolute coolest edgy-meets-girly vibe.
+Try 3: I literally cannot get over this Y2K butterfly baby tee I just scored on Depop for only $18! It gives off the absolute best nostalgic, early-2000s streetwear energy, and I am already planning to style it with baggy dark-wash jeans and chunky sneakers. 🦋✨
+Try 4: I am still not over this Y2K butterfly baby tee I just scored on Depop for only $18! The pastel print screams early 2000s pop princess, but it looks so edgy styled with baggy denim or wide-leg trousers. Honestly debating keeping this absolute gem for myself instead of letting it go!
+Try 5: I am literally screaming over this Y2K butterfly baby tee I just scored on Depop for only $18! The pastel print screams 2000s pop princess, and it looks insanely good paired with baggy low-rise denim or tucked into wide-leg khakis. It's giving major early-2000s mall-rat nostalgia and I might never take it off. 🦋✨
+```
+
+**Criterion 5** — `tools.py::suggest_outfit` (empty-wardrobe branch) →
+`tools.py::create_fit_card`, scenario `"empty wardrobe still returns styling
+advice"`, try 1:
+
+```
+selected_item: Denim Jacket — Light Wash, Cropped ($42.0, poshmark)
+
+outfit_suggestion (first 2 lines):
+A light-wash, cropped Wrangler denim jacket is a fantastic vintage-leaning staple that adds an instant cool-girl edge to any outfit. Since it's cropped, it naturally accentuates the waist and pairs best with high-waisted bottoms, balancing proportions effortlessly.
+
+fit_card: I am still not over scoring this dreamy light-wash cropped Wrangler jacket on Poshmark for just $42! It has that ultimate 90s off-duty model vibe that instantly makes any high-waisted pant or slip dress look ten times cooler. I seriously cannot wait to live in this all season long!
 ```
 
 ---
