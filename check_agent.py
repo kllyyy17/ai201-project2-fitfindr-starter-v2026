@@ -141,6 +141,45 @@ sad = run_agent(query2, get_example_wardrobe())
 check("run_agent empty-search path: error is set", sad["error"] is not None)
 check("run_agent empty-search path: fit_card is still None", sad["fit_card"] is None)
 
+# ── Criterion 3 (criteria.md): session["selected_item"]["id"] must equal the
+# id inside the new_item dict suggest_outfit actually receives, checked by a
+# spy at call time, not by re-reading agent.py and assuming the wiring holds.
+# Run 5 times through the real run_agent(), since criterion 3's target is
+# "5 of 5, checked by trace."
+#
+# Why a spy instead of adding an id to agent.py's existing trace.step() call:
+# a trace line only proves what agent.py CLAIMS it passed. If agent.py ever
+# logged one variable but actually called suggest_outfit with a different,
+# stale item, the trace would still show a match. The spy sits at the actual
+# call boundary and records the id suggest_outfit was really invoked with, so
+# it can't be fooled by a logging bug the way a trace line could be. ───────
+print("\n=== Criterion 3: selected_item id vs. id suggest_outfit actually received ===")
+
+import agent as _agent_module
+from tools import suggest_outfit as _real_suggest_outfit
+
+_captured = {}
+
+
+def _suggest_outfit_spy(new_item, wardrobe):
+    _captured["new_item_id"] = new_item.get("id")
+    return _real_suggest_outfit(new_item, wardrobe)
+
+
+# agent.py did `from tools import suggest_outfit`, so the name to patch lives
+# in agent's own namespace, not tools'.
+_agent_module.suggest_outfit = _suggest_outfit_spy
+
+for i in range(1, 6):
+    _captured.clear()
+    result = run_agent(query, get_example_wardrobe())
+    sel_id = (result.get("selected_item") or {}).get("id")
+    passed_id = _captured.get("new_item_id")
+    print(f"  try {i}: selected_item.id={sel_id!r}  id suggest_outfit received={passed_id!r}")
+    check(f"try {i}: id suggest_outfit received matches selected_item", sel_id == passed_id)
+
+_agent_module.suggest_outfit = _real_suggest_outfit  # restore before anything below runs
+
 # ── Summary ──────────────────────────────────────────────────────────────
 print("\n=== Summary ===")
 n_pass = sum(1 for _, v in results if v == PASS)

@@ -284,35 +284,28 @@ fit_card: I literally screamed when I found this Y2K butterfly baby tee on Depop
 stopped early: yes — No listings matched that search. Try loosening the price ceiling, dropping the size filter, or using different keywords in the description.
 ```
 
-**Criterion 3** — a small spy script wrapping `tools.suggest_outfit` (patched
-into `agent.py`'s namespace, the same one `agent.py::run_agent` calls) so the
-`new_item` it actually receives is captured independently of the session
-dict, run 5 times against `agent.py::run_agent`:
+**Criterion 3** — `check_agent.py` → `agent.py::run_agent`, try 1 (of the 5
+`check_agent.py`'s Criterion 3 section runs): it patches `agent.suggest_outfit`
+with a spy so the `new_item` dict `run_agent` actually passes in is captured
+independently of the session dict. A spy at the call boundary, on purpose,
+rather than adding the id to `agent.py`'s existing trace line; see the
+comment above that section in `check_agent.py` for why a trace line alone
+wouldn't have been strong enough evidence:
 
 ```
-try 1: selected_item.id='lst_002'  new_item passed to suggest_outfit id='lst_002'  match=True
-try 2: selected_item.id='lst_002'  new_item passed to suggest_outfit id='lst_002'  match=True
-try 3: selected_item.id='lst_002'  new_item passed to suggest_outfit id='lst_002'  match=True
-try 4: selected_item.id='lst_002'  new_item passed to suggest_outfit id='lst_002'  match=True
-try 5: selected_item.id='lst_002'  new_item passed to suggest_outfit id='lst_002'  match=True
+  try 1: selected_item.id='lst_002'  id suggest_outfit received='lst_002'
+  [PASS] try 1: id suggest_outfit received matches selected_item
 ```
 
-**Criterion 4** — `tools.py::create_fit_card`, scenario `"fit card mentions
-price and platform"`, same item (`Y2K Baby Tee — Butterfly Print`, $18.0,
-depop) across all 5 tries — wording changes, price and platform don't drop
-out:
+**Criterion 4** — `run_eval.py::run_once` → `agent.py::run_agent`, scenario
+`"fit card mentions price and platform"`, try 1:
 
 ```
 Try 1: I am literally losing my mind over this Y2K butterfly baby tee I just scored on Depop for only $18! It has the absolute best nostalgic, early-2000s mall-goth energy, especially paired with baggy denim or wide-leg trousers. I already have a million outfits planned in my head! 🦋✨
-Try 2: I am still screaming over this Y2K butterfly baby tee I just scored on Depop for only $18! The pink, purple, and white graphic is so nostalgic, and it looks unreal paired with baggy dark wash jeans for that ultimate early-2000s street style. Honestly, tucking it into wide-leg khakis with some combat boots gives the absolute coolest edgy-meets-girly vibe.
-Try 3: I literally cannot get over this Y2K butterfly baby tee I just scored on Depop for only $18! It gives off the absolute best nostalgic, early-2000s streetwear energy, and I am already planning to style it with baggy dark-wash jeans and chunky sneakers. 🦋✨
-Try 4: I am still not over this Y2K butterfly baby tee I just scored on Depop for only $18! The pastel print screams early 2000s pop princess, but it looks so edgy styled with baggy denim or wide-leg trousers. Honestly debating keeping this absolute gem for myself instead of letting it go!
-Try 5: I am literally screaming over this Y2K butterfly baby tee I just scored on Depop for only $18! The pastel print screams 2000s pop princess, and it looks insanely good paired with baggy low-rise denim or tucked into wide-leg khakis. It's giving major early-2000s mall-rat nostalgia and I might never take it off. 🦋✨
 ```
 
-**Criterion 5** — `tools.py::suggest_outfit` (empty-wardrobe branch) →
-`tools.py::create_fit_card`, scenario `"empty wardrobe still returns styling
-advice"`, try 1:
+**Criterion 5** — `run_eval.py::run_once` → `agent.py::run_agent`, scenario
+`"empty wardrobe still returns styling advice"`, try 1:
 
 ```
 selected_item: Denim Jacket — Light Wash, Cropped ($42.0, poshmark)
@@ -345,15 +338,17 @@ fit_card: I am still not over scoring this dreamy light-wash cropped Wrangler ja
 
 | # | Criterion | Target | Verdict | How I decided |
 |---|---|---|---|---|
-| 1 |  |  |  |  |
-| 2 |  |  |  |  |
-| 3 |  |  |  |  |
-| 4 |  |  |  |  |
-| 5 |  |  |  |  |
+| 1 | Matching query completes all three tools and returns a fit card | 4 of 5 | MET (5/5) | All 5 tries in `results/run_2026-09-27_2004_before.md` show `stopped early: no`, a trace hitting `search_listings` → `suggest_outfit` → `create_fit_card`, and a non-empty fit card. 5 passes clears the 4-of-5 bar. |
+| 2 | Impossible query stops before `suggest_outfit` | 5 of 5 | MET (5/5) | All 5 tries show `stopped early: yes`, with the trace ending at `[3] branch → search_results empty — stopping before suggest_outfit`. `suggest_outfit` and `create_fit_card` never appear in any of the 5 traces. |
+| 3 | `session["selected_item"]["id"]` equals the `id` of the `new_item` dict `suggest_outfit` actually receives | 5 of 5 | MET (5/5) | `check_agent.py`'s Criterion 3 section patches `agent.suggest_outfit` with a spy that records the real `new_item` argument at the call boundary, then runs `run_agent` 5 times. All 5 tries print `selected_item.id='lst_002'` next to `id suggest_outfit received='lst_002'` and a `[PASS]` verdict. |
+| 4 | Every fit card mentions the item's price and platform | 5 of 5 | MET (5/5) | Read all 5 fit-card strings for the same item (`$18.0`, depop) plainly: each of the 5 contains "$18" and "Depop" somewhere in the text, with only the surrounding wording varying. |
+| 5 | Empty wardrobe still returns non-empty styling advice through to a fit card | 5 of 5 | MET (5/5) | All 5 empty-wardrobe tries show `stopped early: no`, a non-empty `outfit_suggestion` that gives general advice and names zero wardrobe items (correct, since there are none), and a non-empty fit card. |
 
 **Diagnoses**
 
+No misses this round: all five held at or above their targets, so there's no tool/branch/session/model mechanism to trace down. That's a real result, not a reason to stop reading it critically. The more useful question is whether any target was too easy to fail, and one was.
 
+Criterion 1's `4 of 5` target exists specifically because `search_listings` is a plain keyword-overlap match with no fuzzy matching, so differently-worded queries for the same intent can score zero. But the eval reruns the *exact same string* (`"vintage graphic tee under $30"`) five times. `search_listings` is deterministic (same input, same output, every time), so there was never a way for this run to land anywhere except 0/5 or 5/5. The 20% of slack the target was built to absorb was never actually exercisable; getting 5/5 here confirms the loop and the tool work, but it doesn't tell me anything about the wording-brittleness risk the target names. **This is the criterion I'd tighten**, not by lowering the number, but by changing what gets run: 5 *different* phrasings of a matching intent (e.g. `"vintage graphic tee under $30"`, `"90s band shirt cheap"`, `"graphic tee, budget"`) instead of one phrasing repeated 5 times. That would let a real partial miss show up if one is actually there.
 
 ---
 
