@@ -214,6 +214,12 @@ I am literally losing my mind over these vintage Levi's 501 jeans I just scored 
 - *What came back:* It ran `_parse_query` directly in bash and got the correct result (`max_price: 30.0`), then re-ran my exact PowerShell command and reproduced the failure — PowerShell was interpolating `$30` as an (empty) variable inside the double-quoted `-c` string before Python ever saw it, so the regex had nothing to match.
 - *What I changed:* Nothing in `agent.py` — the parsing code was already correct. I changed how I tested it (single-quoting the query / using `python app.py ask '...'` instead of a `-c` one-liner), and now know to be careful with `$` in PowerShell when testing.
 
+**Moment 3**
+
+- *What I asked for:* For the MCP move, I asked Claude to register `search_listings` in `mcp_server.py` with the same contract as the direct-call version (size/price filtering rule, empty-list-on-no-match), and rewire `agent.py::run_agent` to call it through `mcp_client.call_tool("search_listings", {...})` instead of importing `tools.search_listings` directly.
+- *What came back:* It filled in the commented-out `@mcp.tool()` stub with a docstring restating the size-match, price-ceiling, and empty-list rules, and swapped the direct call in `agent.py` for the `call_tool(...)` version. It worked on the first attempt — no exceptions, no missing fields.
+- *What I changed:* Nothing in the code. Rather than take "it ran without erroring" as proof, I ran `python app.py ask 'vintage graphic tee under $30' --trace` before and after the move and diffed the two traces: the 10-item result list was identical, just relabeled `search_listings (via MCP)` instead of a direct call. That comparison, not the absence of an error, is what I'm actually trusting as evidence the rewire didn't change behavior.
+
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
      Don't fill these in during unit 3.
