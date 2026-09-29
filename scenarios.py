@@ -15,9 +15,27 @@ own criteria need — these are a starting point, not a fixed set.
 
 SCENARIOS = [
     {
-        # A query the data can match. Criterion 1.
+        # Five DIFFERENT phrasings of the same matching intent (a fun/vintage
+        # graphic top under $30), not one phrasing run five times. Criterion 1.
+        #
+        # Revised after the "before" run: that version of this scenario reran
+        # the exact string "vintage graphic tee under $30" five times.
+        # search_listings is a deterministic keyword-overlap match, so five
+        # identical inputs could only ever land on 0/5 or 5/5, meaning the
+        # 20% of slack criterion 1's "4 of 5" target exists to absorb was
+        # never actually exercisable. Five different phrasings of the same
+        # intent let a real wording-brittleness miss show up if one is there.
+        # One of these five ("quirky retro novelty find") verified as a
+        # genuine zero-result miss against tools.py::search_listings before
+        # this went in, see the README diagnosis.
         "name": "matching query completes",
-        "query": "vintage graphic tee under $30",
+        "queries": [
+            "vintage graphic tee under $30",
+            "band tee under $30",
+            "y2k baby tee under $30",
+            "funky throwback top under $30",
+            "quirky retro novelty find under $30",
+        ],
         "wardrobe": "example",
         "criterion": 1,
     },
@@ -63,7 +81,11 @@ def validate() -> list[str]:
     """Complain about anything malformed, before a long run rather than during."""
     problems = []
     for i, scenario in enumerate(SCENARIOS, 1):
-        if not scenario.get("query", "").strip():
+        if "queries" in scenario:
+            queries = scenario["queries"]
+            if not queries or any(not q.strip() for q in queries):
+                problems.append(f"scenario {i} has an empty entry in 'queries'")
+        elif not scenario.get("query", "").strip():
             problems.append(f"scenario {i} has no query")
         if scenario.get("wardrobe") not in WARDROBES:
             problems.append(

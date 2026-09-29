@@ -37,8 +37,9 @@ import config
 import scenarios as scenario_module
 
 
-def run_once(scenario, use_trace=True):
-    """One scenario, one try. Returns everything worth recording."""
+def run_once(scenario, query, use_trace=True):
+    """One scenario, one try, against a specific query. Returns everything
+    worth recording."""
     from agent import run_agent
     from utils.data_loader import get_example_wardrobe, get_empty_wardrobe
     import trace as trace_module
@@ -50,9 +51,9 @@ def run_once(scenario, use_trace=True):
     if use_trace:
         trace_module.start_trace()
 
-    record = {"error": None, "session": None, "trace": "", "crashed": None}
+    record = {"query": query, "error": None, "session": None, "trace": "", "crashed": None}
     try:
-        record["session"] = run_agent(scenario["query"], wardrobe)
+        record["session"] = run_agent(query, wardrobe)
     except Exception as exc:  # noqa: BLE001 — a crash is a result worth logging
         record["crashed"] = f"{type(exc).__name__}: {exc}"
         record["traceback"] = traceback.format_exc()
@@ -61,6 +62,16 @@ def run_once(scenario, use_trace=True):
         record["trace"] = trace_module.get_trace()
 
     return record
+
+
+def _query_for(scenario, attempt):
+    """Most scenarios run the same query every try. A scenario with a
+    'queries' list instead runs a DIFFERENT phrasing on each try, see
+    scenarios.py for why criterion 1 needs that."""
+    if "queries" in scenario:
+        queries = scenario["queries"]
+        return queries[(attempt - 1) % len(queries)]
+    return scenario["query"]
 
 
 def main():
@@ -91,11 +102,15 @@ def main():
     rows = []
     for scenario in scenario_module.SCENARIOS:
         print(f"{scenario['name']}  ({scenario['wardrobe']} wardrobe)")
-        print(f"  query: {scenario['query']}")
+        if "queries" in scenario:
+            print(f"  queries (one per try): {scenario['queries']}")
+        else:
+            print(f"  query: {scenario['query']}")
 
         tries = []
         for attempt in range(1, args.tries + 1):
-            record = run_once(scenario)
+            query = _query_for(scenario, attempt)
+            record = run_once(scenario, query)
             tries.append(record)
 
             if record["crashed"]:
@@ -172,13 +187,21 @@ def write_report(rows, args):
 
     for row in rows:
         scenario = row["scenario"]
+        query_line = (
+            "- Query: a different phrasing each try (see below)"
+            if "queries" in scenario
+            else f"- Query: `{scenario['query']}`"
+        )
         lines += [f"### {scenario['name']}", "",
-                  f"- Query: `{scenario['query']}`",
+                  query_line,
                   f"- Wardrobe: {scenario['wardrobe']}", ""]
 
         for i, record in enumerate(row["tries"], 1):
             lines.append(f"**Try {i}**")
             lines.append("")
+            if "queries" in scenario:
+                lines.append(f"- query: `{record['query']}`")
+                lines.append("")
 
             if record["crashed"]:
                 lines += ["Crashed:", "", "```", record["crashed"], "```", ""]
