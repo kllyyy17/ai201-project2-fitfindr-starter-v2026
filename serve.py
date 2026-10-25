@@ -165,17 +165,20 @@ def ask():
     with _one_at_a_time:
         t_start = time.perf_counter()
         calls_before = generate.call_count()
+        tokens_before = generate.token_counts()["total"]
         try:
             session = run_agent(query, wardrobe)
         except Exception as exc:  # noqa: BLE001 — a 500 with a sentence beats a hang
             failure = f"{type(exc).__name__}: {exc}"
         t_end = time.perf_counter()
         model_calls = generate.call_count() - calls_before
+        tokens = generate.token_counts()["total"] - tokens_before
 
     timing = {
         "wait_s": round(t_start - t_arrived, 3),
         "run_s": round(t_end - t_start, 3),
         "model_calls": model_calls,
+        "tokens": tokens,
     }
 
     # Outside the lock: building a response is not work the next caller should
