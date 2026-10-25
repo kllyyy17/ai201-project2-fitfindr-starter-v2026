@@ -573,6 +573,45 @@ thing" calls for, and criterion 1's target already accounts for this class
 of miss rather than promising it away, but it's the next thing I'd improve
 if I kept going.
 
+---
+
+<!-- ═══════════════════════ UNIT 9 — DEPLOY AND INSTRUMENT ═══════════════════════ -->
+
+## The Shape
+
+**System:** FitFindr, the agent from units 3–4 (`agent.py::run_agent`, with
+`search_listings` moved onto MCP), unchanged.
+
+**Shape: A — Deploy and instrument.** FitFindr currently only runs as a
+one-shot CLI command on my laptop, and [serve.py](serve.py) ships with no
+logging, no timing and no request counting. I'm adding the operational layer
+around the existing `run_agent()`: one structured log line per `POST /ask`
+request (timestamp, query, outcome, `error` if any, and wall-clock duration
+split out from time spent waiting on the one-at-a-time lock), written to a
+file I commit from a real session of several requests, plus a single
+documented start command in RUNNING.md tested from a clean checkout. The
+claim I'll make at the end is a measured one: here is how long a request
+actually takes, and the log proves it ran more than once.
+
+**Path:** B — local with logs. The agent spawns an MCP subprocess per call,
+which is already tight against the free tier's 512 MB, and Path B scores the
+same.
+
+**Out of scope** — things I considered and am not doing:
+
+- **No changes to the agent or its tools.** No new search logic, no fuzzy or
+  synonym matching (the thing "What's Still Broken" says I'd improve next),
+  no new tool. Shape A is about observing the system I have, and changing it
+  mid-measurement would make the numbers meaningless.
+- **No concurrency.** I'm keeping the one-request-at-a-time lock. A real
+  queue or async workers would break `mcp_client.call_tool`'s `asyncio.run()`
+  anyway, and it's a different project.
+- **No hosted deployment or frontend.** No signup, no card, no UI beyond
+  `curl` against `/ask`.
+
+**Size check:** two pieces of building — the log line in `serve.py`, and
+`RUNNING.md` plus the committed run record. Well under ninety minutes.
+
 
 
 <!-- ═════════════════════════════════════════════════════════════════════
