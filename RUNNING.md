@@ -153,6 +153,47 @@ gunicorn serve:app
 that yourself in the follow-along, before you deploy — instrumenting first is
 the point of the session.
 
+### Run it locally with logging (Path B)
+
+**Environment:** Python 3.11–3.13 (tested on 3.12.10), the pinned packages in
+`requirements.txt` (flask, mcp, google-genai, python-dotenv), and a
+`GEMINI_API_KEY` in `.env`. No model files: the model is called over the API.
+
+**Start command** (PowerShell, from the repo root, venv active):
+
+```powershell
+$env:AI201_CACHE = "0"
+python serve.py
+```
+
+`AI201_CACHE=0` turns the prompt cache off. Leave it on and repeated queries
+come back from the cache, so `model_calls` reads 0 and `run_s` is too short to
+mean anything.
+
+**Every `POST /ask` appends one JSON line to `results/serve_log.jsonl`:**
+
+| Field | Meaning |
+|---|---|
+| `ts` | UTC timestamp |
+| `query` | The query received (`null` on a bad request) |
+| `outcome` | `ok`, `no_results`, `agent_error`, `crash` or `bad_request` |
+| `http` | The status code returned |
+| `error` | `session["error"]`, or the exception text on a crash |
+| `wait_s` | Seconds queued behind another request |
+| `run_s` | Seconds inside `run_agent()` |
+| `model_calls` | Model calls this request made |
+
+**Reproduce the committed run record** — in a second terminal:
+
+```powershell
+python send_requests.py
+```
+
+It sends six requests one after another (three that match, two that don't,
+one with no query) and then two at once. The second of the pair shows
+`wait_s` above 0. The committed `results/serve_log.jsonl` came from this
+script.
+
 ---
 
 ## Where everything lives
