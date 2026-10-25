@@ -1,0 +1,8 @@
+{"ts": "2026-10-25T23:37:53+00:00", "outcome": "ok", "http": 200, "query": "vintage graphic tee under $30", "error": null, "wait_s": 0.0, "run_s": 3.319, "model_calls": 2}
+{"ts": "2026-10-25T23:38:01+00:00", "outcome": "ok", "http": 200, "query": "denim jacket under $40", "error": null, "wait_s": 0.0, "run_s": 6.181, "model_calls": 2}
+{"ts": "2026-10-25T23:38:13+00:00", "outcome": "ok", "http": 200, "query": "vintage graphic tee size M under $30", "error": null, "wait_s": 0.0, "run_s": 9.568, "model_calls": 2}
+{"ts": "2026-10-25T23:38:16+00:00", "outcome": "no_results", "http": 200, "query": "black combat boots size 9", "error": "No listings matched that search. Try loosening the price ceiling, dropping the size filter, or using different keywords in the description.", "wait_s": 0.0, "run_s": 1.693, "model_calls": 0}
+{"ts": "2026-10-25T23:38:20+00:00", "outcome": "no_results", "http": 200, "query": "xyzzy plugh under $5", "error": "No listings matched that search. Try loosening the price ceiling, dropping the size filter, or using different keywords in the description.", "wait_s": 0.0, "run_s": 1.71, "model_calls": 0}
+{"ts": "2026-10-25T23:38:22+00:00", "outcome": "bad_request", "http": 400, "query": null}
+{"ts": "2026-10-25T23:38:28+00:00", "outcome": "ok", "http": 200, "query": "oversized flannel under $35", "error": null, "wait_s": 0.0, "run_s": 4.184, "model_calls": 2}
+{"ts": "2026-10-25T23:38:33+00:00", "outcome": "ok", "http": 200, "query": "y2k baby tee under $25", "error": null, "wait_s": 4.183, "run_s": 4.457, "model_calls": 2}
