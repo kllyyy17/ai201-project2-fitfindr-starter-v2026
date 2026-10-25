@@ -33,9 +33,13 @@ then deploy it. A structured log you were handed teaches you nothing about
 what belongs in one — and the timing field is the one everybody skips.
 """
 
+import json
 import os
 import sys
 import threading
+import time
+from datetime import datetime, timezone
+from pathlib import Path
 
 # config first, and before anything that talks to the model: it loads your .env
 # and fixes the Windows console encoding for every module that imports it.
@@ -43,6 +47,7 @@ import config  # noqa: F401
 
 from flask import Flask, jsonify, request
 
+import generate
 from agent import run_agent
 from utils.data_loader import get_example_wardrobe
 
@@ -91,6 +96,23 @@ app = Flask(__name__)
 _one_at_a_time = threading.Lock()
 
 
+# ── structured log ────────────────────────────────────────────────────────────
+# One JSON object per line, one line per POST /ask, appended to results/ so it
+# can be committed as the run record. Timing is split in two on purpose:
+# `wait_s` is time queued behind another request, `run_s` is time inside
+# run_agent(). Without the split, "slow" can't be told apart from "waiting".
+LOG_PATH = Path(__file__).parent / "results" / "serve_log.jsonl"
+
+
+def _log(**fields) -> None:
+    record = {"ts": datetime.now(timezone.utc).isoformat(timespec="seconds"), **fields}
+    try:
+        with LOG_PATH.open("a", encoding="utf-8") as f:
+            print(json.dumps(record), file=f)
+    except OSError as exc:  # a full disk must not turn a good answer into a 500
+        print(f"  [serve] could not write log: {exc}", file=sys.stderr, flush=True)
+
+
 @app.get("/health")
 def health():
     """Is the server awake? A host pings something like this to find out."""
@@ -110,6 +132,7 @@ def ask():
     payload = request.get_json(silent=True) or {}
     query = (payload.get("query") or "").strip()
     if not query:
+        _log(outcome="bad_request", http=400, query=None)
         # 400 rather than a stack trace: the caller can act on this one.
         return jsonify({"error": "Send JSON with a 'query' field, e.g. "
                                  '{"query": "vintage graphic tee under $30"}'}), 400
@@ -138,17 +161,36 @@ def ask():
 
     failure = None
     session = None
+    t_arrived = time.perf_counter()
     with _one_at_a_time:
+        t_start = time.perf_counter()
+        calls_before = generate.call_count()
         try:
             session = run_agent(query, wardrobe)
         except Exception as exc:  # noqa: BLE001 — a 500 with a sentence beats a hang
             failure = f"{type(exc).__name__}: {exc}"
+        t_end = time.perf_counter()
+        model_calls = generate.call_count() - calls_before
+
+    timing = {
+        "wait_s": round(t_start - t_arrived, 3),
+        "run_s": round(t_end - t_start, 3),
+        "model_calls": model_calls,
+    }
 
     # Outside the lock: building a response is not work the next caller should
     # be waiting on.
     if failure is not None:
+        _log(outcome="crash", http=500, query=query, error=failure, **timing)
         return jsonify({"error": failure}), 500
 
+    if not session.get("error"):
+        outcome = "ok"
+    elif session.get("search_results"):
+        outcome = "agent_error"  # got results, then a later step failed
+    else:
+        outcome = "no_results"
+    _log(outcome=outcome, http=200, query=query, error=session.get("error"), **timing)
     return jsonify(session)
 
 
