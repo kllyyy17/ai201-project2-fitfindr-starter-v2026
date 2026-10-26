@@ -172,6 +172,9 @@ mean anything.
 
 **Every `POST /ask` appends one JSON line to `results/serve_log.jsonl`:**
 
+Every line has the same nine fields. A request rejected before the agent runs
+has zero for `wait_s`, `run_s`, `model_calls` and `tokens`.
+
 | Field | Meaning |
 |---|---|
 | `ts` | UTC timestamp |
@@ -182,6 +185,7 @@ mean anything.
 | `wait_s` | Seconds queued behind another request |
 | `run_s` | Seconds inside `run_agent()` |
 | `model_calls` | Model calls this request made |
+| `tokens` | Tokens those calls used (prompt plus output) |
 
 **Reproduce the committed run record** — in a second terminal:
 

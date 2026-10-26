@@ -220,6 +220,12 @@ I am literally losing my mind over these vintage Levi's 501 jeans I just scored 
 - *What came back:* It filled in the commented-out `@mcp.tool()` stub with a docstring restating the size-match, price-ceiling, and empty-list rules, and swapped the direct call in `agent.py` for the `call_tool(...)` version. It worked on the first attempt — no exceptions, no missing fields.
 - *What I changed:* Nothing in the code. Rather than take "it ran without erroring" as proof, I ran `python app.py ask 'vintage graphic tee under $30' --trace` before and after the move and diffed the two traces: the 10-item result list was identical, just relabeled `search_listings (via MCP)` instead of a direct call. That comparison, not the absence of an error, is what I'm actually trusting as evidence the rewire didn't change behavior.
 
+**Moment 4**
+
+- *What I asked for:* After my first three trials, I asked Claude to diagnose the misses for criteria 4 and 5.
+- *What came back:* A diagnosis built on the log rather than guesses: it counted the model calls in the 60 seconds before each slow run, and timed the `google.genai` import separately. The first count it wrote into the README was wrong in three places (25 slow runs with 14 or more calls instead of 26, 13 slow runs at exactly 14 calls instead of 14, and 8 unexplained runs instead of 7).
+- *What I changed:* Claude recomputed the counts from the log with a script before I committed, and corrected all three. I'm trusting the corrected numbers and not the first draft, and the README says where the diagnosis is inferred from timestamps rather than observed.
+
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
      Don't fill these in during unit 3.
@@ -624,8 +630,9 @@ same.
 counters as before/after deltas). The log below is the full file from one
 session with the cache off (`AI201_CACHE=0`), pasted as written. Lines 1–8 are
 a session with a deliberately bad API key, followed by the normal run
-(`send_requests.py`, then `measure_cost.py`). A bad request logs only the
-fields it has, so it carries no timing.
+(`send_requests.py`, then `measure_cost.py`). In this session a bad request
+logged only the fields it had, so it carries no timing; the fix described under
+"Unit 9 — The Improvement" made every record carry all nine fields.
 
 ```jsonl
 {"ts": "2026-10-26T00:03:52+00:00", "outcome": "agent_error", "http": 200, "query": "vintage graphic tee under $30", "error": "The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a fresh key at aistudio.google.com.", "wait_s": 0.0, "run_s": 3.992, "model_calls": 1, "tokens": 0}
@@ -695,6 +702,32 @@ jacket query and 14.84 s for the sundress); eight of the ten finished in
 haven't found what made those two slow. `tokens` is steady, so those runs
 weren't longer answers. These are warm numbers with the server already
 running, and they come from one machine and one session.
+
+**For a hundred people a day.** I'm assuming each person makes 5 matching
+requests a day; that's a guess about usage, not something I measured.
+
+- Runs: 100 people × 5 runs = **500 runs a day**.
+- Tokens: 500 runs × 909.7 tokens = **454,850 tokens a day** (about 13.6
+  million over a 30-day month).
+- Model calls: 500 runs × 2 calls = 1,000 calls a day, against a limit of
+  15 per minute, which is 21,600 a day if spread out evenly.
+- Compute: 500 runs × 5.76 s mean = 2,880 s, about **48 minutes of serial
+  run time a day** (about 37 minutes at the 4.43 s median). The server runs
+  one request at a time, so that's the time it would be busy.
+- Dollars: the token counter logs prompt and output tokens as one total, so I
+  can only bound the price. Third-party pricing sites list `gemini-3.5-flash-lite`
+  at $0.30 per million input tokens and $2.50 per million output tokens
+  ([example](https://www.getmaxim.ai/bifrost/llm-cost-calculator/provider/opencode-zen/model/gemini-3.5-flash-lite));
+  I haven't checked Google's own page. If every token were input,
+  0.45485 M × $0.30 = **$0.14 a day**; if every token were output,
+  0.45485 M × $2.50 = **$1.14 a day**. The real figure sits between them,
+  closer to the lower end if prompts dominate, so roughly **$4 to $34 a
+  month**.
+
+So the arithmetic says cost isn't the constraint at this size: about a dollar
+a day at the most. The constraint is the 15-calls-per-minute limit, because
+a burst of 8 people at once would trigger the pacing sleep I diagnosed
+earlier, not the budget.
 
 ---
 
@@ -885,7 +918,7 @@ the problem that covers the most criteria with the smallest change. A local
 check with Flask's test client sent nine of the malformed inputs and got nine
 400s and nine log lines with nine fields each, before any real re-run.
 
-### Run Log — After
+### Unit 9 — Run Log — After
 
 The same three trials, run the same way (`run_criteria.py --label after1`,
 `after2`, `after3`, with a fresh server for each part and the cache off), after
@@ -996,27 +1029,42 @@ of two calls each, then this run's first and second call), which is where
 
 ---
 
-## What's Still Broken
+## Unit 9 — What's Still Broken
 
-- **Criterion 5 and the 20 s cap.** A back-to-back stream of matching requests
-  hits the free tier's 15-calls-per-minute pacing in `generate.py::_wait_for_slot`
-  around the seventh request, which then takes about 20 s. Run 3's slowest
-  request was 19.965 s, and that's the only reason the cap held there. I
-  didn't fix it: the limit is the service's, not mine, and removing the wait
-  would turn a pause into a rate-limit error. The criterion isn't broken, so I
-  haven't revised it. It's a real limit of the deployment under sustained
-  load, and a queue that spaces requests out, or a paid tier, would be the
-  next thing to try.
-- **Criterion 4's cold start.** The first request after a restart pays for the
-  lazy `google.genai` import and the first MCP subprocess, 5.0–6.8 s across six
-  trials. Importing at startup, in `serve.py`, would move that cost out of the
-  first request.
-- **`run_s` hides where the time goes.** The log records one `run_s`, so the
-  rate-limit sleep and the import are inferred from timestamps and call
-  counts, not read from the log. A `wait_for_slot_s` field would make
-  criterion 5's cause visible instead of arguable.
-- **Seven slow runs I couldn't explain** in the 81 earlier `ok` runs started
-  with fewer than 14 calls in the preceding minute.
+Two criteria are still missed. Both come from time spent inside
+`generate.py`, which this unit's one fix didn't touch.
+
+**Criterion 4 (bad key fails in 5.0 s or less): missed, 4/5 in all three
+after-trials.**
+*What I'd do:* import `google.genai` and build the client when `serve.py`
+starts, so the first request doesn't pay for it. That import took 3.48 s when I
+timed it, and the first request after a restart took 5.0–6.8 s against 1.2–2.0
+s for the rest.
+*Why I stopped:* the unit allows one improvement, and I picked the problem
+that covered two criteria. I also couldn't separate the import from the first
+MCP subprocess starting, so I'd want to measure before claiming this fixes it.
+
+**Criterion 5 (8 of 10 matching runs at 5.0 s or less, none above 20 s):
+missed, 7/10, 7/10, 9/10.**
+*What I'd do:* not remove the pacing wait, because `_wait_for_slot` exists to
+stay under the free tier's 15-calls-per-minute limit and removing it would
+turn a pause into a rate-limit error. I'd put a queue in front that spaces
+requests out, or move to a paid tier whose limit is higher.
+*Why I stopped:* the limit belongs to the service, so the fix is a deployment
+decision and not a one-line change. The criterion isn't broken, so I didn't
+revise it: a back-to-back stream of matching requests really does hit the
+limit around the seventh one (the "cargo pants" request took about 20 s in
+five of six trials).
+
+**Not tied to a criterion:** seven slow runs in the earlier log started with
+fewer than 14 calls in the preceding minute, and I haven't explained them.
+
+**What I'd do next, if this were real and I had another unit.** I'd add a
+`wait_for_slot_s` field to the log, recording how long `_wait_for_slot`
+slept in each request. Both open misses come from time inside `generate.py`
+that `run_s` lumps together with real work, I had to infer the pacing
+diagnosis from timestamps, and no fix for either criterion is worth building
+until the log can show which of them a slow run was.
 
 ---
 
