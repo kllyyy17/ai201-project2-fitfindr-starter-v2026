@@ -105,7 +105,15 @@ LOG_PATH = Path(__file__).parent / "results" / "serve_log.jsonl"
 
 
 def _log(**fields) -> None:
-    record = {"ts": datetime.now(timezone.utc).isoformat(timespec="seconds"), **fields}
+    # Every record carries the same nine fields, whatever happened, so the log
+    # can be read back without special cases. A request that never reached the
+    # agent did no work, so its timing and counts are zero rather than absent.
+    record = {
+        "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "outcome": None, "http": None, "query": None, "error": None,
+        "wait_s": 0.0, "run_s": 0.0, "model_calls": 0, "tokens": 0,
+    }
+    record.update(fields)
     try:
         with LOG_PATH.open("a", encoding="utf-8") as f:
             print(json.dumps(record), file=f)
@@ -129,13 +137,19 @@ def ask():
                                                 example wardrobe the CLI uses.
     Out:  the session dict from run_agent(), as JSON.
     """
-    payload = request.get_json(silent=True) or {}
-    query = (payload.get("query") or "").strip()
+    # Valid JSON of the wrong shape (a list, a string, a number for "query")
+    # is still a bad request, not a crash: check the types before using them.
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    query = payload.get("query")
+    query = query.strip() if isinstance(query, str) else ""
     if not query:
-        _log(outcome="bad_request", http=400, query=None)
+        message = ("Send JSON with a 'query' field, e.g. "
+                   '{"query": "vintage graphic tee under $30"}')
+        _log(outcome="bad_request", http=400, error=message)
         # 400 rather than a stack trace: the caller can act on this one.
-        return jsonify({"error": "Send JSON with a 'query' field, e.g. "
-                                 '{"query": "vintage graphic tee under $30"}'}), 400
+        return jsonify({"error": message}), 400
 
     wardrobe = payload.get("wardrobe")
     if not isinstance(wardrobe, dict):

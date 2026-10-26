@@ -807,6 +807,84 @@ lines are written by `serve.py::_log`.
 
 ---
 
+## Unit 9 — Verdicts and Diagnoses
+
+| Criterion | Target | Runs | Verdict |
+|---|---|---|---|
+| 1. Malformed input never causes a 500 | 9 of 10 | 6/10, 6/10, 6/10 | MISSED |
+| 2. One log record per request, same nine fields | 20 of 20 | 0/20, 0/20, 0/20 | MISSED |
+| 3. Queued `wait_s` matches the run ahead | 5 of 5 | 5/5, 5/5, 5/5 | MET |
+| 4. Bad-key run fails in 5.0 s or less | 5 of 5 | 4/5, 5/5, 4/5 | MISSED |
+| 5. 8 of 10 matching runs at 5.0 s or less, none above 20 s | 8 of 10 | 7/10, 6/10, 7/10 | MISSED |
+
+Criterion 4 reached 5/5 once, but the target is every run, so it's a miss.
+
+**Criteria 1 and 2: one stage, two symptoms.** The stage is the input path at
+the top of `serve.py::ask`, before the agent runs. It did
+`payload = request.get_json(silent=True) or {{}}` and then
+`(payload.get("query") or "").strip()`, which assumes the body is a dict and
+`query` is a string. A JSON list, a JSON string, `{{"query": 123}}` and
+`{{"query": ["a"]}}` are valid JSON of the wrong shape, so `.get` or `.strip()`
+raised `AttributeError`. That happens outside the `try` that wraps
+`run_agent`, so Flask returned a bare 500 (criterion 1: 4 of 10 failed, the
+same four every trial). The same four then left no log line, because `_log`
+is only called after the checks pass: the log gained 16 lines for 20 requests.
+Criterion 2 also has a second cause in the same function: the `bad_request`
+branch called `_log(outcome="bad_request", http=400, query=None)`, so its five
+lines were missing `error`, `wait_s`, `run_s`, `model_calls` and `tokens`.
+Both are `ask()` assuming well-formed input.
+
+**Criterion 4: first-request cost in `generate.py::_get_client`.** The misses
+were all the first request on a freshly started server (5.155 s and 5.19 s,
+with 4.97 s in the run that passed); the other four took 1.4–2.9 s. `_get_client`
+does `from google import genai` lazily, on the first call, and that import
+alone took 3.48 s when I timed it separately. The gap between the first
+request and the rest is about the same size. The mechanism is that the
+five-second limit left almost no room for a one-time import, so the target
+sat on the edge and the cold start decided it. I couldn't separate this from
+the first MCP subprocess starting, which also happens in that request.
+
+**Criterion 5: pacing in `generate.py::_wait_for_slot`.** A matching run makes
+two model calls, and `_wait_for_slot` sleeps whenever 15 calls have been made
+in the last 60 seconds (`config.REQUESTS_PER_MINUTE`). Ten matching requests
+sent back to back are 20 calls in under a minute, so the later ones wait for
+the window to clear, and that sleep is counted in `run_s`. The criterion
+assumed a run's cost doesn't depend on the runs before it, and it does. In the
+81 `ok` runs in the log, 33 took over 5 s. Counting model calls in the 60
+seconds before each run started, all 12 runs that started with 16 calls in the
+window were slow, and 26 of the 33 slow runs started with 14 or more. I'm
+inferring this from timestamps rather than from a log field, because the sleep
+isn't recorded: `ts` has one-second resolution, and runs starting with 14
+calls were mixed (14 slow, 22 fast), so it's not clean. Seven slow runs
+started with fewer than 14 calls in the window and I haven't explained them.
+
+**Pattern.** Two problems, not four:
+
+- `serve.py::ask`'s input handling explains criteria 1 and 2.
+- Time spent inside `generate.py` that `run_s` lumps together with real work
+  (a one-time import, a rate-limit sleep) explains criteria 4 and 5. The log
+  can't tell them apart from model latency, which is why I had to infer both.
+
+Criterion 3 held in all 15 pairs and needs no diagnosis.
+
+## Unit 9 — The Improvement
+
+**One change: make `serve.py::ask` validate its input and log every
+request the same way.** It's aimed at the first pattern, which covers two
+criteria. In `serve.py`:
+
+- `ask()` now accepts the payload only if it's a dict and reads `query` only
+  if it's a string; anything else takes the existing 400 path.
+- `_log()` now fills in all nine fields for every record, with zeros for the
+  timing and counts of a request that never reached the agent, and the
+  `bad_request` record carries its error message.
+
+I didn't touch `generate.py`, so criteria 4 and 5 are not expected to change.
+Fixing them would mean changing the pacing or the client setup, and I chose
+the problem that covers the most criteria with the smallest change. A local
+check with Flask's test client sent nine of the malformed inputs and got nine
+400s and nine log lines with nine fields each, before any real re-run.
+
 <!-- ═════════════════════════════════════════════════════════════════════
 
      SUBMISSION CHECKLIST — unit 3
