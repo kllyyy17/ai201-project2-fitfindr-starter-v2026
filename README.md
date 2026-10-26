@@ -698,6 +698,115 @@ running, and they come from one machine and one session.
 
 ---
 
+## Run Log — Unit 9
+
+Three trials of each criterion, nothing changed between them, cache off
+(`AI201_CACHE=0`). Each trial used a fresh `serve.py`: one with the real key
+for criteria 1, 2, 3 and 5, and one started with `GEMINI_API_KEY=bad-key` for
+criterion 4. Everything ran through `run_criteria.py`, which writes
+`results/unit9_run<N>.txt` and `results/unit9_run<N>_badkey.txt`.
+
+| Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
+|---|---|---|---|---|---|
+| 1. Malformed input never causes a 500 | 9 of 10 | 6/10 | 6/10 | 6/10 | MISSED |
+| 2. Every request leaves one log record with the same nine fields | 20 of 20 | 0/20 | 0/20 | 0/20 | MISSED |
+| 3. A queued request's `wait_s` matches the run ahead of it | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 4. A bad-key run fails in 5.0 s or less | 5 of 5 | 4/5 | 5/5 | 4/5 | MISSED |
+| 5. Matching requests: 8 of 10 at `run_s` ≤ 5.0 s, none above 20 s | 8 of 10 | 7/10 | 6/10 | 7/10 | MISSED |
+
+How the scores were counted:
+
+- **Criterion 2** scores 0/20 whenever the log doesn't gain exactly 20 lines.
+  All three runs gained 16 lines, 11 of them with all nine fields. The 5
+  `bad_request` lines were each missing five fields, and 4 requests left no
+  line at all.
+- **Criterion 5** counts runs with `outcome: ok` and `run_s` ≤ 5.0 s. Run 1's
+  slowest run was 21.8 s, so it also breaks the 20 s cap; the other two stayed
+  under it (12.2 s and 19.8 s).
+- **Criterion 4**'s misses were all the first request on a fresh server (5.155
+  s in run 1, 5.19 s in run 3). Run 2's first request took 4.97 s.
+- **Criterion 3** passed with a difference of 0.018 s or less in all 15 pairs,
+  including pairs where the first run took 19.5 s and 21.3 s.
+
+Output from run 1, pasted from the saved files. The requests are sent by
+`run_criteria.py`; the HTTP responses come from `serve.py::ask`, and the log
+lines are written by `serve.py::_log`.
+
+**Criterion 1** (`results/unit9_run1.txt`, from `serve.py::ask`):
+
+```
+== Criterion 1: malformed input never causes a 500 ==
+  PASS  not JSON               status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  FAIL  JSON list              status=500  'None'
+  FAIL  JSON string            status=500  'None'
+  FAIL  query is a number      status=500  'None'
+  PASS  query is null          status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  PASS  query is empty         status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  PASS  query is whitespace    status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  FAIL  query is a list        status=500  'None'
+  PASS  wardrobe only          status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  PASS  5000-char query        status=200  'None'
+  Criterion 1 score: 6/10  (target 9 of 10)
+```
+
+**Criterion 2** (`results/unit9_run1.txt`, from `serve.py::_log`):
+
+```
+== Criterion 2: one log record per request, same nine fields ==
+  FAIL  line 0: outcome=bad_request fields differ: missing=['error', 'model_calls', 'run_s', 'tokens', 'wait_s'] extra=[]
+  FAIL  line 1: outcome=bad_request fields differ: missing=['error', 'model_calls', 'run_s', 'tokens', 'wait_s'] extra=[]
+  FAIL  line 2: outcome=bad_request fields differ: missing=['error', 'model_calls', 'run_s', 'tokens', 'wait_s'] extra=[]
+  FAIL  line 3: outcome=bad_request fields differ: missing=['error', 'model_calls', 'run_s', 'tokens', 'wait_s'] extra=[]
+  FAIL  line 4: outcome=bad_request fields differ: missing=['error', 'model_calls', 'run_s', 'tokens', 'wait_s'] extra=[]
+  Log gained 16 lines (expected 20); 11 valid.
+  Criterion 2 score: 0/20  (target 20 of 20, exactly 20 new lines)
+```
+
+**Criterion 3** (`results/unit9_run1.txt`, from `serve.py::ask`'s lock and `_log`):
+
+```
+== Criterion 3: queued request's wait_s matches the run ahead of it ==
+  PASS  pair 1: first run_s=3.512  second wait_s=3.499  diff=0.013
+  PASS  pair 2: first run_s=3.87  second wait_s=3.87  diff=0.000
+  PASS  pair 3: first run_s=21.258  second wait_s=21.258  diff=0.000
+  PASS  pair 4: first run_s=4.058  second wait_s=4.043  diff=0.015
+  PASS  pair 5: first run_s=3.772  second wait_s=3.772  diff=0.000
+  Criterion 3 score: 5/5  (target 5 of 5)
+```
+
+**Criterion 4** (`results/unit9_run1_badkey.txt`, from `serve.py::ask` and
+`agent.py::run_agent`):
+
+```
+== Criterion 4: bad API key fails in 5 s or less (server started with a bad key) ==
+  FAIL  'vintage graphic tee under $30'            outcome=agent_error  run_s=5.155
+  PASS  'denim jacket under $40'                   outcome=agent_error  run_s=1.524
+  PASS  'y2k baby tee under $25'                   outcome=agent_error  run_s=1.546
+  PASS  'oversized flannel under $35'              outcome=agent_error  run_s=1.451
+  PASS  'vintage graphic tee size M under $30'     outcome=agent_error  run_s=1.726
+  Criterion 4 score: 4/5  (target 5 of 5, first request included)
+```
+
+**Criterion 5** (`results/unit9_run1.txt`, from `serve.py::_log`):
+
+```
+== Criterion 5: matching requests run_s <= 5.0 s, none > 20 s ==
+  PASS  'vintage graphic tee under $30'            outcome=ok         run_s=3.426 model_calls=2
+  PASS  'denim jacket under $40'                   outcome=ok         run_s=4.701 model_calls=2
+  PASS  'y2k baby tee under $25'                   outcome=ok         run_s=3.434 model_calls=2
+  PASS  'oversized flannel under $35'              outcome=ok         run_s=3.883 model_calls=2
+  PASS  'vintage graphic tee size M under $30'     outcome=ok         run_s=3.574 model_calls=2
+  PASS  'black leather jacket under $60'           outcome=ok         run_s=3.444 model_calls=2
+  FAIL  'cargo pants under $40'                    outcome=ok         run_s=21.828 model_calls=2
+  PASS  'floral sundress under $30'                outcome=ok         run_s=3.541 model_calls=2
+  PASS  'chunky sneakers under $50'                outcome=ok         run_s=4.545 model_calls=2
+  PASS  'knit sweater under $35'                   outcome=ok         run_s=3.666 model_calls=2
+  Slowest run_s: 21.828
+  Criterion 5 score: 7/10  (target 8 of 10, none above 20 s)
+```
+
+---
+
 <!-- ═════════════════════════════════════════════════════════════════════
 
      SUBMISSION CHECKLIST — unit 3

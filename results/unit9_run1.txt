@@ -1,0 +1,59 @@
+unit 9 criteria — run1
+
+== Criterion 1: malformed input never causes a 500 ==
+  PASS  not JSON               status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  FAIL  JSON list              status=500  'None'
+  FAIL  JSON string            status=500  'None'
+  FAIL  query is a number      status=500  'None'
+  PASS  query is null          status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  PASS  query is empty         status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  PASS  query is whitespace    status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  FAIL  query is a list        status=500  'None'
+  PASS  wardrobe only          status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  PASS  5000-char query        status=200  'None'
+  Criterion 1 score: 6/10  (target 9 of 10)
+
+== Ordinary requests (feed criteria 2 and 5) ==
+  200  'vintage graphic tee under $30'
+  200  'denim jacket under $40'
+  200  'y2k baby tee under $25'
+  200  'oversized flannel under $35'
+  200  'vintage graphic tee size M under $30'
+  200  'black leather jacket under $60'
+  200  'cargo pants under $40'
+  200  'floral sundress under $30'
+  200  'chunky sneakers under $50'
+  200  'knit sweater under $35'
+
+== Criterion 2: one log record per request, same nine fields ==
+  FAIL  line 0: outcome=bad_request fields differ: missing=['error', 'model_calls', 'run_s', 'tokens', 'wait_s'] extra=[]
+  FAIL  line 1: outcome=bad_request fields differ: missing=['error', 'model_calls', 'run_s', 'tokens', 'wait_s'] extra=[]
+  FAIL  line 2: outcome=bad_request fields differ: missing=['error', 'model_calls', 'run_s', 'tokens', 'wait_s'] extra=[]
+  FAIL  line 3: outcome=bad_request fields differ: missing=['error', 'model_calls', 'run_s', 'tokens', 'wait_s'] extra=[]
+  FAIL  line 4: outcome=bad_request fields differ: missing=['error', 'model_calls', 'run_s', 'tokens', 'wait_s'] extra=[]
+  Log gained 16 lines (expected 20); 11 valid.
+  Criterion 2 score: 0/20  (target 20 of 20, exactly 20 new lines)
+
+== Criterion 5: matching requests run_s <= 5.0 s, none > 20 s ==
+  PASS  'vintage graphic tee under $30'            outcome=ok         run_s=3.426 model_calls=2
+  PASS  'denim jacket under $40'                   outcome=ok         run_s=4.701 model_calls=2
+  PASS  'y2k baby tee under $25'                   outcome=ok         run_s=3.434 model_calls=2
+  PASS  'oversized flannel under $35'              outcome=ok         run_s=3.883 model_calls=2
+  PASS  'vintage graphic tee size M under $30'     outcome=ok         run_s=3.574 model_calls=2
+  PASS  'black leather jacket under $60'           outcome=ok         run_s=3.444 model_calls=2
+  FAIL  'cargo pants under $40'                    outcome=ok         run_s=21.828 model_calls=2
+  PASS  'floral sundress under $30'                outcome=ok         run_s=3.541 model_calls=2
+  PASS  'chunky sneakers under $50'                outcome=ok         run_s=4.545 model_calls=2
+  PASS  'knit sweater under $35'                   outcome=ok         run_s=3.666 model_calls=2
+  Slowest run_s: 21.828
+  Criterion 5 score: 7/10  (target 8 of 10, none above 20 s)
+
+== Criterion 3: queued request's wait_s matches the run ahead of it ==
+  PASS  pair 1: first run_s=3.512  second wait_s=3.499  diff=0.013
+  PASS  pair 2: first run_s=3.87  second wait_s=3.87  diff=0.000
+  PASS  pair 3: first run_s=21.258  second wait_s=21.258  diff=0.000
+  PASS  pair 4: first run_s=4.058  second wait_s=4.043  diff=0.015
+  PASS  pair 5: first run_s=3.772  second wait_s=3.772  diff=0.000
+  Criterion 3 score: 5/5  (target 5 of 5)
+
+Saved to C:\Users\lykim\CodePath AI201\ai201-project2-fitfindr-starter-v2026\results\unit9_run1.txt

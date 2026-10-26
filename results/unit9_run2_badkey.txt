@@ -1,0 +1,11 @@
+unit 9 criteria — run2 (bad key)
+
+== Criterion 4: bad API key fails in 5 s or less (server started with a bad key) ==
+  PASS  'vintage graphic tee under $30'            outcome=agent_error  run_s=4.97
+  PASS  'denim jacket under $40'                   outcome=agent_error  run_s=1.495
+  PASS  'y2k baby tee under $25'                   outcome=agent_error  run_s=1.665
+  PASS  'oversized flannel under $35'              outcome=agent_error  run_s=1.687
+  PASS  'vintage graphic tee size M under $30'     outcome=agent_error  run_s=1.547
+  Criterion 4 score: 5/5  (target 5 of 5, first request included)
+
+Saved to C:\Users\lykim\CodePath AI201\ai201-project2-fitfindr-starter-v2026\results\unit9_run2_badkey.txt
