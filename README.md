@@ -614,6 +614,90 @@ same.
 
 
 
+## Instrumentation
+
+`serve.py` appends one JSON object per `POST /ask` to
+`results/serve_log.jsonl`, including requests that fail. Fields: `ts` (UTC),
+`outcome` (`ok`, `no_results`, `agent_error`, `crash`, `bad_request`), `http`,
+`query`, `error`, `wait_s` (queued behind another request), `run_s` (inside
+`run_agent()`), `model_calls` and `tokens` (both read from `generate.py`'s
+counters as before/after deltas). The log below is the full file from one
+session with the cache off (`AI201_CACHE=0`), pasted as written. Lines 1–8 are
+a session with a deliberately bad API key, followed by the normal run
+(`send_requests.py`, then `measure_cost.py`). A bad request logs only the
+fields it has, so it carries no timing.
+
+```jsonl
+{"ts": "2026-10-26T00:03:52+00:00", "outcome": "agent_error", "http": 200, "query": "vintage graphic tee under $30", "error": "The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a fresh key at aistudio.google.com.", "wait_s": 0.0, "run_s": 3.992, "model_calls": 1, "tokens": 0}
+{"ts": "2026-10-26T00:03:55+00:00", "outcome": "agent_error", "http": 200, "query": "denim jacket under $40", "error": "The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a fresh key at aistudio.google.com.", "wait_s": 0.0, "run_s": 1.086, "model_calls": 1, "tokens": 0}
+{"ts": "2026-10-26T00:03:59+00:00", "outcome": "agent_error", "http": 200, "query": "vintage graphic tee size M under $30", "error": "The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a fresh key at aistudio.google.com.", "wait_s": 0.0, "run_s": 1.125, "model_calls": 1, "tokens": 0}
+{"ts": "2026-10-26T00:04:02+00:00", "outcome": "no_results", "http": 200, "query": "black combat boots size 9", "error": "No listings matched that search. Try loosening the price ceiling, dropping the size filter, or using different keywords in the description.", "wait_s": 0.0, "run_s": 0.966, "model_calls": 0, "tokens": 0}
+{"ts": "2026-10-26T00:04:05+00:00", "outcome": "no_results", "http": 200, "query": "xyzzy plugh under $5", "error": "No listings matched that search. Try loosening the price ceiling, dropping the size filter, or using different keywords in the description.", "wait_s": 0.0, "run_s": 1.152, "model_calls": 0, "tokens": 0}
+{"ts": "2026-10-26T00:04:07+00:00", "outcome": "bad_request", "http": 400, "query": null}
+{"ts": "2026-10-26T00:04:10+00:00", "outcome": "agent_error", "http": 200, "query": "y2k baby tee under $25", "error": "The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a fresh key at aistudio.google.com.", "wait_s": 0.0, "run_s": 1.234, "model_calls": 1, "tokens": 0}
+{"ts": "2026-10-26T00:04:11+00:00", "outcome": "agent_error", "http": 200, "query": "oversized flannel under $35", "error": "The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a fresh key at aistudio.google.com.", "wait_s": 1.22, "run_s": 1.071, "model_calls": 1, "tokens": 0}
+{"ts": "2026-10-26T00:04:47+00:00", "outcome": "ok", "http": 200, "query": "vintage graphic tee under $30", "error": null, "wait_s": 0.0, "run_s": 5.257, "model_calls": 2, "tokens": 951}
+{"ts": "2026-10-26T00:04:52+00:00", "outcome": "ok", "http": 200, "query": "denim jacket under $40", "error": null, "wait_s": 0.0, "run_s": 3.259, "model_calls": 2, "tokens": 1124}
+{"ts": "2026-10-26T00:04:58+00:00", "outcome": "ok", "http": 200, "query": "vintage graphic tee size M under $30", "error": null, "wait_s": 0.0, "run_s": 3.099, "model_calls": 2, "tokens": 960}
+{"ts": "2026-10-26T00:05:01+00:00", "outcome": "no_results", "http": 200, "query": "black combat boots size 9", "error": "No listings matched that search. Try loosening the price ceiling, dropping the size filter, or using different keywords in the description.", "wait_s": 0.0, "run_s": 0.973, "model_calls": 0, "tokens": 0}
+{"ts": "2026-10-26T00:05:04+00:00", "outcome": "no_results", "http": 200, "query": "xyzzy plugh under $5", "error": "No listings matched that search. Try loosening the price ceiling, dropping the size filter, or using different keywords in the description.", "wait_s": 0.0, "run_s": 1.0, "model_calls": 0, "tokens": 0}
+{"ts": "2026-10-26T00:05:06+00:00", "outcome": "bad_request", "http": 400, "query": null}
+{"ts": "2026-10-26T00:05:11+00:00", "outcome": "ok", "http": 200, "query": "oversized flannel under $35", "error": null, "wait_s": 0.0, "run_s": 3.687, "model_calls": 2, "tokens": 1049}
+{"ts": "2026-10-26T00:05:16+00:00", "outcome": "ok", "http": 200, "query": "y2k baby tee under $25", "error": null, "wait_s": 3.672, "run_s": 4.448, "model_calls": 2, "tokens": 972}
+{"ts": "2026-10-26T00:05:35+00:00", "outcome": "ok", "http": 200, "query": "vintage graphic tee under $30", "error": null, "wait_s": 0.0, "run_s": 4.695, "model_calls": 2, "tokens": 782}
+{"ts": "2026-10-26T00:05:40+00:00", "outcome": "ok", "http": 200, "query": "denim jacket under $40", "error": null, "wait_s": 0.0, "run_s": 3.621, "model_calls": 2, "tokens": 854}
+{"ts": "2026-10-26T00:05:47+00:00", "outcome": "ok", "http": 200, "query": "y2k baby tee under $25", "error": null, "wait_s": 0.0, "run_s": 4.385, "model_calls": 2, "tokens": 949}
+{"ts": "2026-10-26T00:05:52+00:00", "outcome": "ok", "http": 200, "query": "oversized flannel under $35", "error": null, "wait_s": 0.0, "run_s": 3.728, "model_calls": 2, "tokens": 983}
+{"ts": "2026-10-26T00:05:59+00:00", "outcome": "ok", "http": 200, "query": "vintage graphic tee size M under $30", "error": null, "wait_s": 0.0, "run_s": 4.087, "model_calls": 2, "tokens": 990}
+{"ts": "2026-10-26T00:06:10+00:00", "outcome": "ok", "http": 200, "query": "black leather jacket under $60", "error": null, "wait_s": 0.0, "run_s": 9.524, "model_calls": 2, "tokens": 937}
+{"ts": "2026-10-26T00:06:17+00:00", "outcome": "ok", "http": 200, "query": "cargo pants under $40", "error": null, "wait_s": 0.0, "run_s": 4.544, "model_calls": 2, "tokens": 881}
+{"ts": "2026-10-26T00:06:34+00:00", "outcome": "ok", "http": 200, "query": "floral sundress under $30", "error": null, "wait_s": 0.0, "run_s": 14.835, "model_calls": 2, "tokens": 862}
+{"ts": "2026-10-26T00:06:40+00:00", "outcome": "ok", "http": 200, "query": "chunky sneakers under $50", "error": null, "wait_s": 0.0, "run_s": 4.483, "model_calls": 2, "tokens": 1044}
+{"ts": "2026-10-26T00:06:46+00:00", "outcome": "ok", "http": 200, "query": "knit sweater under $35", "error": null, "wait_s": 0.0, "run_s": 3.697, "model_calls": 2, "tokens": 815}
+```
+
+What the log shows:
+
+- **Failures leave records.** Five requests ran with a bad key and logged
+  `agent_error` with the key message, `model_calls: 1` and `tokens: 0`. A
+  failed model call still cost 1.1–4.0 s of `run_s`.
+- **No-match queries are cheap.** `no_results` runs make no model calls and
+  take about 1 s (`run_s` 0.97–1.15).
+- **Queueing is visible.** In the two-at-once pair, the second request logged
+  `wait_s: 3.672` behind a 3.687 s run. The wait matches the run ahead of it.
+
+---
+
+## What It Costs
+
+**One successful run (a query that matches, through `search_listings`,
+`suggest_outfit` and `create_fit_card`): about 910 tokens, 2 model calls and
+5.8 s on average.** There is no dollar figure, because the model is on a free
+tier with nothing billed.
+
+**How I measured it.** `measure_cost.py` sent ten different queries that each
+match a listing to a running `serve.py` (cache off, so every answer is a real
+call), and averaged the last ten `ok` lines of the log. `tokens` is the
+change in `generate.token_counts()["total"]` (prompt plus output tokens, as
+reported by the service) across each request; `run_s` is wall-clock time
+inside the request lock, via `time.perf_counter()`; `model_calls` is the change
+in `generate.call_count()`.
+
+| | mean | median | min | max |
+|---|---|---|---|---|
+| `run_s` (seconds) | 5.76 | 4.43 | 3.62 | 14.84 |
+| `tokens` | 909.7 | 909.0 | 782 | 1044 |
+| `model_calls` | 2 | 2 | 2 | 2 |
+
+The mean of `run_s` is pulled up by two slow runs (9.52 s for the leather
+jacket query and 14.84 s for the sundress); eight of the ten finished in
+3.6–4.7 s, so the median of 4.43 s is the better figure for a typical run. I
+haven't found what made those two slow. `tokens` is steady, so those runs
+weren't longer answers. These are warm numbers with the server already
+running, and they come from one machine and one session.
+
+---
+
 <!-- ═════════════════════════════════════════════════════════════════════
 
      SUBMISSION CHECKLIST — unit 3
