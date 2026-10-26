@@ -1,0 +1,54 @@
+unit 9 criteria — after1
+
+== Criterion 1: malformed input never causes a 500 ==
+  PASS  not JSON               status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  PASS  JSON list              status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  PASS  JSON string            status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  PASS  query is a number      status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  PASS  query is null          status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  PASS  query is empty         status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  PASS  query is whitespace    status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  PASS  query is a list        status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  PASS  wardrobe only          status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  PASS  5000-char query        status=200  'None'
+  Criterion 1 score: 10/10  (target 9 of 10)
+
+== Ordinary requests (feed criteria 2 and 5) ==
+  200  'vintage graphic tee under $30'
+  200  'denim jacket under $40'
+  200  'y2k baby tee under $25'
+  200  'oversized flannel under $35'
+  200  'vintage graphic tee size M under $30'
+  200  'black leather jacket under $60'
+  200  'cargo pants under $40'
+  200  'floral sundress under $30'
+  200  'chunky sneakers under $50'
+  200  'knit sweater under $35'
+
+== Criterion 2: one log record per request, same nine fields ==
+  Log gained 20 lines (expected 20); 20 valid.
+  Criterion 2 score: 20/20  (target 20 of 20, exactly 20 new lines)
+
+== Criterion 5: matching requests run_s <= 5.0 s, none > 20 s ==
+  PASS  'vintage graphic tee under $30'            outcome=ok         run_s=3.236 model_calls=2
+  PASS  'denim jacket under $40'                   outcome=ok         run_s=3.615 model_calls=2
+  PASS  'y2k baby tee under $25'                   outcome=ok         run_s=3.201 model_calls=2
+  PASS  'oversized flannel under $35'              outcome=ok         run_s=3.262 model_calls=2
+  PASS  'vintage graphic tee size M under $30'     outcome=ok         run_s=3.941 model_calls=2
+  FAIL  'black leather jacket under $60'           outcome=ok         run_s=5.531 model_calls=2
+  FAIL  'cargo pants under $40'                    outcome=ok         run_s=21.667 model_calls=2
+  PASS  'floral sundress under $30'                outcome=ok         run_s=2.96 model_calls=2
+  PASS  'chunky sneakers under $50'                outcome=ok         run_s=3.45 model_calls=2
+  PASS  'knit sweater under $35'                   outcome=ok         run_s=3.646 model_calls=2
+  Slowest run_s: 21.667
+  Criterion 5 score: 7/10  (target 8 of 10, none above 20 s)
+
+== Criterion 3: queued request's wait_s matches the run ahead of it ==
+  PASS  pair 1: first run_s=3.22  second wait_s=3.205  diff=0.015
+  PASS  pair 2: first run_s=3.864  second wait_s=3.863  diff=0.001
+  PASS  pair 3: first run_s=21.634  second wait_s=21.619  diff=0.015
+  PASS  pair 4: first run_s=3.594  second wait_s=3.594  diff=0.000
+  PASS  pair 5: first run_s=3.106  second wait_s=3.106  diff=0.000
+  Criterion 3 score: 5/5  (target 5 of 5)
+
+Saved to C:\Users\lykim\CodePath AI201\ai201-project2-fitfindr-starter-v2026\results\unit9_after1.txt

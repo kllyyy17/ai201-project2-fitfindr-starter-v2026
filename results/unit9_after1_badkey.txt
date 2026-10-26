@@ -1,0 +1,11 @@
+unit 9 criteria — after1 (bad key)
+
+== Criterion 4: bad API key fails in 5 s or less (server started with a bad key) ==
+  FAIL  'vintage graphic tee under $30'            outcome=agent_error  run_s=5.304
+  PASS  'denim jacket under $40'                   outcome=agent_error  run_s=1.241
+  PASS  'y2k baby tee under $25'                   outcome=agent_error  run_s=1.379
+  PASS  'oversized flannel under $35'              outcome=agent_error  run_s=1.28
+  PASS  'vintage graphic tee size M under $30'     outcome=agent_error  run_s=1.335
+  Criterion 4 score: 4/5  (target 5 of 5, first request included)
+
+Saved to C:\Users\lykim\CodePath AI201\ai201-project2-fitfindr-starter-v2026\results\unit9_after1_badkey.txt

@@ -885,6 +885,141 @@ the problem that covers the most criteria with the smallest change. A local
 check with Flask's test client sent nine of the malformed inputs and got nine
 400s and nine log lines with nine fields each, before any real re-run.
 
+### Run Log — After
+
+The same three trials, run the same way (`run_criteria.py --label after1`,
+`after2`, `after3`, with a fresh server for each part and the cache off), after
+the change to `serve.py::ask` and `_log`. Nothing else was changed between the
+two sets.
+
+| Criterion | Target | Before (1 / 2 / 3) | After (1 / 2 / 3) | Verdict before | Verdict after |
+|---|---|---|---|---|---|
+| 1. Malformed input never causes a 500 | 9 of 10 | 6/10, 6/10, 6/10 | 10/10, 10/10, 10/10 | MISSED | MET |
+| 2. One log record per request, same nine fields | 20 of 20 | 0/20, 0/20, 0/20 | 20/20, 20/20, 20/20 | MISSED | MET |
+| 3. Queued `wait_s` matches the run ahead | 5 of 5 | 5/5, 5/5, 5/5 | 5/5, 5/5, 5/5 | MET | MET |
+| 4. Bad-key run fails in 5.0 s or less | 5 of 5 | 4/5, 5/5, 4/5 | 4/5, 4/5, 4/5 | MISSED | MISSED |
+| 5. 8 of 10 matching runs at 5.0 s or less, none above 20 s | 8 of 10 | 7/10, 6/10, 7/10 | 7/10, 7/10, 9/10 | MISSED | MISSED |
+
+Output from after-run 1 (`results/unit9_after1.txt` and
+`results/unit9_after1_badkey.txt`). The responses come from `serve.py::ask`
+and the log lines from `serve.py::_log`.
+
+**Criterion 1:**
+
+```
+== Criterion 1: malformed input never causes a 500 ==
+  PASS  not JSON               status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  PASS  JSON list              status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  PASS  JSON string            status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  PASS  query is a number      status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  PASS  query is null          status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  PASS  query is empty         status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  PASS  query is whitespace    status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  PASS  query is a list        status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  PASS  wardrobe only          status=400  'Send JSON with a \'query\' field, e.g. {"query": "vintage graphic tee under $30"}'
+  PASS  5000-char query        status=200  'None'
+  Criterion 1 score: 10/10  (target 9 of 10)
+```
+
+**Criterion 2:**
+
+```
+== Criterion 2: one log record per request, same nine fields ==
+  Log gained 20 lines (expected 20); 20 valid.
+  Criterion 2 score: 20/20  (target 20 of 20, exactly 20 new lines)
+```
+
+**Criterion 3:**
+
+```
+== Criterion 3: queued request's wait_s matches the run ahead of it ==
+  PASS  pair 1: first run_s=3.22  second wait_s=3.205  diff=0.015
+  PASS  pair 2: first run_s=3.864  second wait_s=3.863  diff=0.001
+  PASS  pair 3: first run_s=21.634  second wait_s=21.619  diff=0.015
+  PASS  pair 4: first run_s=3.594  second wait_s=3.594  diff=0.000
+  PASS  pair 5: first run_s=3.106  second wait_s=3.106  diff=0.000
+  Criterion 3 score: 5/5  (target 5 of 5)
+```
+
+**Criterion 4:**
+
+```
+== Criterion 4: bad API key fails in 5 s or less (server started with a bad key) ==
+  FAIL  'vintage graphic tee under $30'            outcome=agent_error  run_s=5.304
+  PASS  'denim jacket under $40'                   outcome=agent_error  run_s=1.241
+  PASS  'y2k baby tee under $25'                   outcome=agent_error  run_s=1.379
+  PASS  'oversized flannel under $35'              outcome=agent_error  run_s=1.28
+  PASS  'vintage graphic tee size M under $30'     outcome=agent_error  run_s=1.335
+  Criterion 4 score: 4/5  (target 5 of 5, first request included)
+```
+
+**Criterion 5:**
+
+```
+== Criterion 5: matching requests run_s <= 5.0 s, none > 20 s ==
+  PASS  'vintage graphic tee under $30'            outcome=ok         run_s=3.236 model_calls=2
+  PASS  'denim jacket under $40'                   outcome=ok         run_s=3.615 model_calls=2
+  PASS  'y2k baby tee under $25'                   outcome=ok         run_s=3.201 model_calls=2
+  PASS  'oversized flannel under $35'              outcome=ok         run_s=3.262 model_calls=2
+  PASS  'vintage graphic tee size M under $30'     outcome=ok         run_s=3.941 model_calls=2
+  FAIL  'black leather jacket under $60'           outcome=ok         run_s=5.531 model_calls=2
+  FAIL  'cargo pants under $40'                    outcome=ok         run_s=21.667 model_calls=2
+  PASS  'floral sundress under $30'                outcome=ok         run_s=2.96 model_calls=2
+  PASS  'chunky sneakers under $50'                outcome=ok         run_s=3.45 model_calls=2
+  PASS  'knit sweater under $35'                   outcome=ok         run_s=3.646 model_calls=2
+  Slowest run_s: 21.667
+  Criterion 5 score: 7/10  (target 8 of 10, none above 20 s)
+```
+
+**Did it help?** Yes, for the two criteria it was aimed at. The four inputs
+that returned a 500 in every earlier trial now return a 400, and the 5,000
+character query still answers normally, so criterion 1 went from 6/10 to
+10/10 in all three trials. The log now gains exactly 20 lines for 20 requests
+in all three trials, every one with the same nine fields, so criterion 2 went
+from 0/20 to 20/20. Criterion 3 was unaffected.
+
+Criteria 4 and 5 didn't change, as I expected, because I didn't touch
+`generate.py`. Criterion 4's first request took 5.3, 6.8 and 5.9 s, a bit
+higher than before (5.2, 5.0, 5.2 s), and I can't say whether that's noise or
+a change; the other four requests stayed at 1.2–2.0 s. Criterion 5's 9/10 in
+the third trial is one passing run among three, not a change: the target has to
+hold in every trial and it didn't in the other two. I saw no trade-off, meaning
+nothing got worse that I measured.
+
+The strongest new evidence for the pacing diagnosis came from this
+comparison. In both sets the seventh matching query ("cargo pants") was the
+slow one: 21.8, 9.7 and 19.8 s before, and 21.7, 21.0 and 20.0 s after, so five
+of six trials took about 20 s on the same request. It's the request where
+the run crosses 15 calls in the last minute (two warm-up calls plus six runs
+of two calls each, then this run's first and second call), which is where
+`_wait_for_slot` would sleep.
+
+---
+
+## What's Still Broken
+
+- **Criterion 5 and the 20 s cap.** A back-to-back stream of matching requests
+  hits the free tier's 15-calls-per-minute pacing in `generate.py::_wait_for_slot`
+  around the seventh request, which then takes about 20 s. Run 3's slowest
+  request was 19.965 s, and that's the only reason the cap held there. I
+  didn't fix it: the limit is the service's, not mine, and removing the wait
+  would turn a pause into a rate-limit error. The criterion isn't broken, so I
+  haven't revised it. It's a real limit of the deployment under sustained
+  load, and a queue that spaces requests out, or a paid tier, would be the
+  next thing to try.
+- **Criterion 4's cold start.** The first request after a restart pays for the
+  lazy `google.genai` import and the first MCP subprocess, 5.0–6.8 s across six
+  trials. Importing at startup, in `serve.py`, would move that cost out of the
+  first request.
+- **`run_s` hides where the time goes.** The log records one `run_s`, so the
+  rate-limit sleep and the import are inferred from timestamps and call
+  counts, not read from the log. A `wait_for_slot_s` field would make
+  criterion 5's cause visible instead of arguable.
+- **Seven slow runs I couldn't explain** in the 81 earlier `ok` runs started
+  with fewer than 14 calls in the preceding minute.
+
+---
+
 <!-- ═════════════════════════════════════════════════════════════════════
 
      SUBMISSION CHECKLIST — unit 3
