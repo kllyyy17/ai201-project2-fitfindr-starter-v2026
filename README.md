@@ -583,6 +583,16 @@ if I kept going.
 
 <!-- ═══════════════════════ UNIT 9 — DEPLOY AND INSTRUMENT ═══════════════════════ -->
 
+## What This Extends
+
+This extends **FitFindr**, the secondhand-shopping agent from units 3 and 4
+(`agent.py::run_agent`, with `search_listings` called through MCP). The agent
+itself is unchanged. What's new is the operational layer in
+[serve.py](serve.py): one structured log line per request (including failures
+and rejected input), timing split into queue wait and run time, token counts,
+input validation, and the scripts that exercise it (`send_requests.py`,
+`measure_cost.py`, `run_criteria.py`).
+
 ## The Shape
 
 **System:** FitFindr, the agent from units 3–4 (`agent.py::run_agent`, with
@@ -619,6 +629,23 @@ same.
 `RUNNING.md` plus the committed run record. Well under ninety minutes.
 
 
+
+## Running It
+
+Path B, local with logs. The full instructions are in
+[RUNNING.md](RUNNING.md), under "Run it locally with logging". In short, with
+Python 3.11–3.13 (tested on 3.12.10), the pinned packages from
+`requirements.txt`, and `GEMINI_API_KEY` in `.env`:
+
+```powershell
+$env:AI201_CACHE = "0"
+python serve.py
+```
+
+then `python send_requests.py` in a second terminal. There are no model files:
+the model is called over the API, so nothing is downloaded beyond the
+packages. I followed these instructions from a fresh clone in a separate
+folder before running the trials.
 
 ## Instrumentation
 
@@ -851,6 +878,19 @@ lines are written by `serve.py::_log`.
 | 5. 8 of 10 matching runs at 5.0 s or less, none above 20 s | 8 of 10 | 7/10, 6/10, 7/10 | MISSED |
 
 Criterion 4 reached 5/5 once, but the target is every run, so it's a miss.
+
+Two notes on how this was scored:
+
+- **Criterion 1.** `criteria.md` says a malformed request should return "a
+  4xx or a normal 200 with `session["error"]` set". `run_criteria.py` counts
+  any status below 500 as a pass, so a 5,000-character query that gets a
+  normal answer isn't scored as a failure. Under the stricter reading that
+  query might not count, but the four failures that decide the verdict are
+  all 500s, so the verdict is the same either way.
+- **Order of work.** The criteria were committed (`add capstone criteria`)
+  after the instrumentation and cost measurement already existed, so I knew the
+  baseline timings when I set the targets; criterion 5's reason says so. They
+  were committed before any of the test results (`add unit 9 test results`).
 
 **Criteria 1 and 2: one stage, two symptoms.** The stage is the input path at
 the top of `serve.py::ask`, before the agent runs. It did
