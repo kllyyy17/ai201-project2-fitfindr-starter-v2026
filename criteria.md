@@ -155,3 +155,94 @@ because the model or the search got unlucky.
      A number you missed stays where it is, gets diagnosed, and gets a fix
      attempted. That's where the points are.
      ───────────────────────────────────────────────────────────────────────── -->
+
+
+---
+
+# Unit 9 — extension criteria
+
+Written before any unit 9 results were checked against them. These cover the
+extension (`serve.py`'s run path and `results/serve_log.jsonl`), not the agent
+itself. "Run" means one `POST /ask`. Timings are `run_s` from the log, on a
+server that has already answered one request, with `AI201_CACHE=0`.
+
+---
+
+## 1. Malformed input never causes a 500
+
+Send ten malformed requests: a body that isn't JSON, a JSON list, a JSON
+string, `{"query": 123}`, `{"query": null}`, `{"query": ""}`, `{"query": "   "}`,
+`{"query": ["a"]}`, `{"wardrobe": "x"}` with no query, and a 5,000-character
+query. At least 9 of the 10 return a 4xx or a normal 200 with
+`session["error"]` set — none of them a 500 or a dropped connection.
+
+**Why this target:**
+`ask()` calls `.get()` on whatever `get_json` returns and `.strip()` on
+whatever `query` is, and neither is type-checked, so inputs that are valid JSON
+but the wrong type are the likely failures. I allow one miss instead of zero
+because a 5,000-character query goes through the regex parser and the model,
+which I haven't tested and can't fully predict. A 500 here would mean a caller
+gets a stack-trace-shaped error for a typo.
+
+---
+
+## 2. Every request leaves exactly one log record, with the same fields
+
+After sending the ten requests from criterion 1 plus ten ordinary ones (twenty
+total), `results/serve_log.jsonl` gains exactly 20 lines, every line parses as
+JSON, and every line has the same nine fields: `ts`, `outcome`, `http`,
+`query`, `error`, `wait_s`, `run_s`, `model_calls`, `tokens`. 20 of 20 lines,
+no exceptions.
+
+**Why this target:**
+The log is the only evidence I'll have when something goes wrong, and a request that leaves no record or a record missing `run_s` can't be diagnosed or averaged. A
+percentage would hide exactly the requests I most need to see. Today a bad
+request logs fewer fields than the others, so this is a target I expect to
+have to work for.
+
+---
+
+## 3. A queued request's `wait_s` matches the run ahead of it
+
+Send two requests at once, five times. In each pair, the second request's
+`wait_s` is within 1.0 s of the first request's `run_s`. 5 of 5 pairs.
+
+**Why this target:**
+The one-at-a-time lock means a queued request waits for exactly the run in
+front of it, so if `wait_s` is off by more than a second the timing is
+measuring something other than the queue and I can't trust the split between
+waiting and running. One second is generous against runs of 3–5 s, and
+stricter than that would just be measuring clock noise. 5 of 5, because this
+is arithmetic about a lock, not model variance.
+
+---
+
+## 4. A run with a bad API key fails in 5 seconds or less
+
+With an invalid `GEMINI_API_KEY`, send five requests that match a listing. All
+five come back with `outcome: "agent_error"` and `run_s` of 5.0 s or less,
+the first one included.
+
+**Why this target:**
+A rejected key can't succeed on retry, so the user should hear about it
+quickly, and a five-second wait for a one-line error is the most I'd accept
+before a person assumes the service hung. `generate.py` paces and retries
+calls, and I've seen failed runs take anywhere from about 1 s to over 10 s,
+so I don't know that the first request stays under five. I'm requiring 5 of 5
+because a slow failure is the case where nobody finds out the key is wrong.
+
+---
+
+## 5. A typical matching request is fast enough to wait for
+
+Ten matching queries, run one at a time: at least 8 of the 10 have `run_s` of
+5.0 s or less, and none has `run_s` above 20 s.
+
+**Why this target:**
+Each run is two model calls plus an MCP subprocess. The cost measurement in
+the README had a median of 4.4 s with two of ten runs well above that, so 5 s
+should be reachable most of the time but not always. I picked it knowing that
+baseline, which means it's close to the edge on purpose. I'm measuring a count
+under a threshold rather than the mean, because a couple of slow runs would
+swamp a mean without telling me anything about the typical case. The 20 s cap
+covers the worst case a person would give up on.
